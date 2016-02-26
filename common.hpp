@@ -24,7 +24,7 @@ enum VarNumber {
   // DH_UNKS
   VAR_U = 0,
   VAR_P = 1,
-  //VAR_L = 2,
+  VAR_Z = 2,
 
   // DH_MESH
   VAR_M = 0
