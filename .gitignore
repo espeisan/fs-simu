@@ -1,0 +1,9 @@
+*.o
+*.vtk
+*.tif
+*.pvsm
+.cproject
+.project
+*.xml
+*~
+*.msh
