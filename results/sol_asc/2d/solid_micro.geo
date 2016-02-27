@@ -1,5 +1,5 @@
 // Gmsh project created on Tue May 19 13:43:01 2015
-lc = 0.1;  //0.01
+lc = 0.3;  //0.01
 lb = lc;
 xc = 0.5;
 yc = 0.5;

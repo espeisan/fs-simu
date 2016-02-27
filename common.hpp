@@ -24,7 +24,8 @@ enum VarNumber {
   // DH_UNKS
   VAR_U = 0,
   VAR_P = 1,
-  VAR_Z = 2,
+  VAR_F = 2,  //variable fluid only
+  VAR_Z = 3,  //variable solid
 
   // DH_MESH
   VAR_M = 0
@@ -459,8 +460,8 @@ public:
   std::vector<int> triple_tags;
   std::vector<int> periodic_tags;
   std::vector<int> feature_tags; // 3d only .. assume 90 degree corners
-  std::vector<int> flusoli_tags;
-  std::vector<int> fluidonly_tags;
+  std::vector<int> flusoli_tags;  //fluid solid interface
+  std::vector<int> fluidonly_tags;  //fluid only
 
   DofHandler                   dof_handler[2];
   MeshIoMsh                    msh_reader;
@@ -541,7 +542,7 @@ public:
 
 
   // dofs
-  int           n_unknowns, n_unknowns_fs;
+  int           n_unknowns;
   int           n_dofs_v_mesh;
   int           n_dofs_u_per_cell;
   int           n_dofs_u_per_facet;
@@ -553,6 +554,13 @@ public:
   int           n_dofs_v_per_facet;
   int           n_dofs_v_per_corner;
   //int           n_dofs_v2_per_facet;
+  int           n_unknowns_fs;
+  int           n_dofs_f_per_cell;
+  int           n_dofs_f_per_facet;
+  int           n_dofs_f_per_corner;
+  int           n_dofs_z_per_cell;
+  int           n_dofs_z_per_facet;
+  int           n_dofs_z_per_corner;
   
   // mesh alias
   int           n_nodes;
