@@ -351,14 +351,22 @@ bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
   else
     feature_tags.clear();
 
-  flusol_tags.resize(1e8);  //cout << flusol_tags.max_size() << endl;
-  nmax = flusol_tags.size();
-  PetscOptionsGetIntArray(PETSC_NULL, "-fsi_tags", flusol_tags.data(), &nmax, &flg_tags); //looks for -dir_tags and find nmax and gives bool value to flg_tags
+  flusoli_tags.resize(1e8);  //cout << flusol_tags.max_size() << endl;
+  nmax = flusoli_tags.size();
+  PetscOptionsGetIntArray(PETSC_NULL, "-fsi_tags", flusoli_tags.data(), &nmax, &flg_tags);
   if (flg_tags)
-	flusol_tags.resize(nmax);
+	flusoli_tags.resize(nmax);
   else
-	flusol_tags.clear();
+	flusoli_tags.clear();
   //cout << nmax << endl;  for (int Ii = 0; Ii < nmax; Ii++) {cout << flusol_tags[Ii] << " ";}
+
+  fluidonly_tags.resize(16);  //cout << flusol_tags.max_size() << endl;
+  nmax = fluidonly_tags.size();
+  PetscOptionsGetIntArray(PETSC_NULL, "-fonly_tags", fluidonly_tags.data(), &nmax, &flg_tags);
+  if (flg_tags)
+	fluidonly_tags.resize(nmax);
+  else
+	fluidonly_tags.clear();
 
   PetscOptionsEnd();   //Finish PetscOptions*
 
@@ -609,8 +617,13 @@ void AppCtx::dofsCreate()
   // dof handler create
   dof_handler[DH_UNKS].setMesh(mesh.get());
   dof_handler[DH_UNKS].addVariable("velo",  shape_phi_c.get(), dim);
+  if (!fluidonly_tags.empty()){
+    int fo_tag = fluidonly_tags[0];
+    dof_handler[DH_UNKS].addVariable("velo_fluid", shape_phi_c.get(), dim, 5, &fo_tag);
+  }
   dof_handler[DH_UNKS].addVariable("pres",  shape_psi_c.get(), 1);
   dof_handler[DH_UNKS].getVariable(VAR_P).setType(SPLITTED_BY_REGION_CELL,0,0);
+
   //Matrix<bool, Dynamic, Dynamic> blocks(2,2);
   //blocks.setOnes();
   //blocks(1,1)=pres_pres_block;
@@ -714,6 +727,7 @@ void AppCtx::dofsUpdate()
   }
   dof_handler[DH_UNKS].linkDofs(dofs1.size(), dofs1.data(), dofs2.data());
   n_unknowns = dof_handler[DH_UNKS].numDofs();
+  n_unknowns_fs = dof_handler[DH_UNKS].numDofs();
 
   dof_handler[DH_MESH].SetUp();
   n_dofs_v_mesh = dof_handler[DH_MESH].numDofs();
@@ -736,15 +750,30 @@ PetscErrorCode AppCtx::allocPetscObjs()
   ierr = VecSetSizes(Vec_up_0, PETSC_DECIDE, n_unknowns);             CHKERRQ(ierr);
   ierr = VecSetFromOptions(Vec_up_0);                                 CHKERRQ(ierr);
 
+  //Vec Vec_uzp_0;
+  ierr = VecCreate(PETSC_COMM_WORLD, &Vec_uzp_0);                      CHKERRQ(ierr);
+  ierr = VecSetSizes(Vec_uzp_0, PETSC_DECIDE, n_unknowns_fs);          CHKERRQ(ierr);
+  ierr = VecSetFromOptions(Vec_uzp_0);                                 CHKERRQ(ierr);
+
   //Vec Vec_up_1;
   ierr = VecCreate(PETSC_COMM_WORLD, &Vec_up_1);                       CHKERRQ(ierr);
   ierr = VecSetSizes(Vec_up_1, PETSC_DECIDE, n_unknowns);              CHKERRQ(ierr);
   ierr = VecSetFromOptions(Vec_up_1);                                  CHKERRQ(ierr);
 
+  //Vec Vec_uzp_1;
+  ierr = VecCreate(PETSC_COMM_WORLD, &Vec_uzp_1);                       CHKERRQ(ierr);
+  ierr = VecSetSizes(Vec_uzp_1, PETSC_DECIDE, n_unknowns_fs);           CHKERRQ(ierr);
+  ierr = VecSetFromOptions(Vec_uzp_1);                                  CHKERRQ(ierr);
+
   //Vec Vec_dup;
   ierr = VecCreate(PETSC_COMM_WORLD, &Vec_dup);                       CHKERRQ(ierr);
   ierr = VecSetSizes(Vec_dup, PETSC_DECIDE, n_unknowns);              CHKERRQ(ierr);
   ierr = VecSetFromOptions(Vec_dup);                                  CHKERRQ(ierr);
+
+  //Vec Vec_duzp;
+  ierr = VecCreate(PETSC_COMM_WORLD, &Vec_duzp);                       CHKERRQ(ierr);
+  ierr = VecSetSizes(Vec_duzp, PETSC_DECIDE, n_unknowns_fs);           CHKERRQ(ierr);
+  ierr = VecSetFromOptions(Vec_duzp);                                  CHKERRQ(ierr);
 
   if (is_bdf3)
   {

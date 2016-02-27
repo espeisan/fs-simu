@@ -459,7 +459,8 @@ public:
   std::vector<int> triple_tags;
   std::vector<int> periodic_tags;
   std::vector<int> feature_tags; // 3d only .. assume 90 degree corners
-  std::vector<int> flusol_tags;
+  std::vector<int> flusoli_tags;
+  std::vector<int> fluidonly_tags;
 
   DofHandler                   dof_handler[2];
   MeshIoMsh                    msh_reader;
@@ -540,7 +541,7 @@ public:
 
 
   // dofs
-  int           n_unknowns;
+  int           n_unknowns, n_unknowns_fs;
   int           n_dofs_v_mesh;
   int           n_dofs_u_per_cell;
   int           n_dofs_u_per_facet;
@@ -579,7 +580,7 @@ public:
   std::vector<Real>    mesh_sizes;
 
   // petsc vectors
-  Vec                 Vec_res, Vec_up_0, Vec_up_1,Vec_dup, Vec_normal/**/;
+  Vec                 Vec_res, Vec_up_0, Vec_up_1,Vec_dup, Vec_normal/**/, Vec_uzp_0, Vec_uzp_1, Vec_duzp;
   Vec                 Vec_dup_0; // for bdf3
   Mat                 Mat_Jac;
   SNES                snes;         /* nonlinear solver context */
