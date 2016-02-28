@@ -154,13 +154,15 @@ void AppCtx::loadDofs()
   n_dofs_v_per_facet  = dof_handler[DH_UNKS].getVariable(VAR_M).numDofsPerFacet();
   n_dofs_v_per_corner = dof_handler[DH_UNKS].getVariable(VAR_M).numDofsPerCorner();
 
-  n_dofs_f_per_cell   = dof_handler[DH_UNKS].getVariable(VAR_F).numDofsPerCell();
-  n_dofs_f_per_facet  = dof_handler[DH_UNKS].getVariable(VAR_F).numDofsPerFacet();
-  n_dofs_f_per_corner = dof_handler[DH_UNKS].getVariable(VAR_F).numDofsPerCorner();
-  n_dofs_z_per_cell   = dof_handler[DH_UNKS].getVariable(VAR_Z).numDofsPerCell();
-  n_dofs_z_per_facet  = dof_handler[DH_UNKS].getVariable(VAR_Z).numDofsPerFacet();
-  n_dofs_z_per_corner = dof_handler[DH_UNKS].getVariable(VAR_Z).numDofsPerCorner();
-
+  n_dofs_f_per_cell   = dof_handler[DH_UNKM].getVariable(VAR_U).numDofsPerCell();
+  n_dofs_f_per_facet  = dof_handler[DH_UNKM].getVariable(VAR_U).numDofsPerFacet();
+  n_dofs_f_per_corner = dof_handler[DH_UNKM].getVariable(VAR_U).numDofsPerCorner();
+  n_dofs_z_per_cell   = dof_handler[DH_UNKM].getVariable(VAR_Z).numDofsPerCell();
+  n_dofs_z_per_facet  = dof_handler[DH_UNKM].getVariable(VAR_Z).numDofsPerFacet();
+  n_dofs_z_per_corner = dof_handler[DH_UNKM].getVariable(VAR_Z).numDofsPerCorner();
+  n_dofs_q_per_cell   = dof_handler[DH_UNKM].getVariable(VAR_Q).numDofsPerCell();
+  n_dofs_q_per_facet  = dof_handler[DH_UNKM].getVariable(VAR_Q).numDofsPerFacet();
+  n_dofs_q_per_corner = dof_handler[DH_UNKM].getVariable(VAR_Q).numDofsPerCorner();
 }
 
 void AppCtx::setUpDefaultOptions()
@@ -626,13 +628,6 @@ void AppCtx::dofsCreate()
   dof_handler[DH_UNKS].addVariable("velo",  shape_phi_c.get(), dim);
   dof_handler[DH_UNKS].addVariable("pres",  shape_psi_c.get(), 1);
   dof_handler[DH_UNKS].getVariable(VAR_P).setType(SPLITTED_BY_REGION_CELL,0,0);
-  //if (!fluidonly_tags.empty() && (dim == 2)){
-    int const * fo_tag = &fluidonly_tags[0];
-    int const * so_tag = &flusoli_tags[0];
-    dof_handler[DH_UNKS].addVariable("velo_fluid", shape_phi_c.get(), dim, fluidonly_tags.size(), fo_tag);
-    dof_handler[DH_UNKS].addVariable("velo_solid", shape_phi_c.get(), 3, flusoli_tags.size(), so_tag);
-  //}
-
   //Matrix<bool, Dynamic, Dynamic> blocks(2,2);
   //blocks.setOnes();
   //blocks(1,1)=pres_pres_block;
@@ -644,6 +639,16 @@ void AppCtx::dofsCreate()
   //dof_handler[DH_MESH].setVariablesRelationship(blocks.data());
   //int VV = dof_handler[DH_UNKS].numDofs();
   //cout << VV << endl;
+
+  //if (!fluidonly_tags.empty() && (dim == 2)){
+    int const * fo_tag = &fluidonly_tags[0];
+    int const * so_tag = &flusoli_tags[0];
+    dof_handler[DH_UNKM].setMesh(mesh.get());
+    dof_handler[DH_UNKM].addVariable("velo_fluid", shape_phi_c.get(), dim, fluidonly_tags.size(), fo_tag);
+    dof_handler[DH_UNKM].addVariable("velo_solid", shape_phi_c.get(), 3, flusoli_tags.size(), so_tag);
+    dof_handler[DH_UNKM].addVariable("pres_fs",  shape_psi_c.get(), 1);
+    dof_handler[DH_UNKM].getVariable(VAR_Q).setType(SPLITTED_BY_REGION_CELL,0,0);
+  //}
 }
 
 bool isPeriodic(Point const* p1, Point const* p2, int dim)
@@ -677,6 +682,7 @@ bool isPeriodic(Point const* p1, Point const* p2, int dim)
 void AppCtx::dofsUpdate()
 {
   dof_handler[DH_UNKS].SetUp();
+  dof_handler[DH_UNKM].SetUp();
   //if (renumber_dofs)
   //  dof_handler[DH_UNKS].CuthillMcKeeRenumber();
 
@@ -3135,22 +3141,27 @@ int main(int argc, char **argv)
   // print info
   cout << endl; cout << "mesh: " << user.filename << endl;
   user.mesh->printInfo();
-  cout << "\n# velocity unknows: " << user.dof_handler[DH_UNKS].getVariable(VAR_U).numPositiveDofs();
-  cout << "\n# preassure unknows: " << user.dof_handler[DH_UNKS].getVariable(VAR_P).numPositiveDofs() << endl;
+  cout << "\n# velocity unknowns: " << user.dof_handler[DH_UNKS].getVariable(VAR_U).numPositiveDofs();
+  cout << "\n# pressure unknowns: " << user.dof_handler[DH_UNKS].getVariable(VAR_P).numPositiveDofs() << endl;
   if (!user.fluidonly_tags.empty() && (user.dim == 2)){
-    cout << "\n# velocity fluid only unknows: " << user.dof_handler[DH_UNKS].getVariable(VAR_F).numPositiveDofs();
-    cout << "\n# velocity solid int unknows: " << user.dof_handler[DH_UNKS].getVariable(VAR_Z).numPositiveDofs();
+    cout << "\n# velocity fluid only unknowns: " << user.dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs();
+    cout << "\n# velocity solid int unknowns: " << user.dof_handler[DH_UNKM].getVariable(VAR_Z).numPositiveDofs();
+    cout << "\n# pressure unknowns: " << user.dof_handler[DH_UNKM].getVariable(VAR_Q).numPositiveDofs();
+    //cout << "\n# total unknowns: " << user.
   }
   cout << endl;
   user.mesh->printStatistics();
   user.mesh->timer.printTimes();
 
-  cout << endl; cout << "feature_tags =  ";
-  for (int i = 0; i < (int)user.feature_tags.size(); ++i)
-  {
-    cout << user.feature_tags[i] << " ";
-  }
   cout << endl;
+  if (!user.feature_tags.empty()){
+    cout << "feature_tags =  ";
+    for (int i = 0; i < (int)user.feature_tags.size(); ++i)
+    {
+      cout << user.feature_tags[i] << " ";
+    }
+  cout << endl;
+  }
 
   printf("on update mesh\n");
   user.onUpdateMesh();

@@ -24,8 +24,11 @@ enum VarNumber {
   // DH_UNKS
   VAR_U = 0,
   VAR_P = 1,
-  VAR_F = 2,  //variable fluid only
-  VAR_Z = 3,  //variable solid
+
+  // DH_UNKM  Unknowns modified
+  //VAR_U     //variable fluid only
+  VAR_Z = 1,  //variable solid
+  VAR_Q = 2,
 
   // DH_MESH
   VAR_M = 0
@@ -33,7 +36,8 @@ enum VarNumber {
 
 enum DofHandlerNumber {
   DH_UNKS = 0,
-  DH_MESH = 1
+  DH_MESH = 1,
+  DH_UNKM = 2
 };
 
 enum PairSpace {
@@ -463,7 +467,7 @@ public:
   std::vector<int> flusoli_tags;  //fluid solid interface
   std::vector<int> fluidonly_tags;  //fluid only
 
-  DofHandler                   dof_handler[2];
+  DofHandler                   dof_handler[3];
   MeshIoMsh                    msh_reader;
   MeshIoVtk                    vtk_printer;
   shared_ptr<Mesh>             mesh;
@@ -561,6 +565,9 @@ public:
   int           n_dofs_z_per_cell;
   int           n_dofs_z_per_facet;
   int           n_dofs_z_per_corner;
+  int           n_dofs_q_per_cell;
+  int           n_dofs_q_per_facet;
+  int           n_dofs_q_per_corner;
   
   // mesh alias
   int           n_nodes;
