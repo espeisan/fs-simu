@@ -744,7 +744,8 @@ void AppCtx::dofsUpdate()
   }
   dof_handler[DH_UNKS].linkDofs(dofs1.size(), dofs1.data(), dofs2.data());
   n_unknowns = dof_handler[DH_UNKS].numDofs();
-  n_unknowns_fs = dof_handler[DH_UNKS].numDofs();
+  dof_handler[DH_UNKM].linkDofs(dofs1.size(), dofs1.data(), dofs2.data());
+  n_unknowns_fs = dof_handler[DH_UNKM].numDofs();
 
   dof_handler[DH_MESH].SetUp();
   n_dofs_v_mesh = dof_handler[DH_MESH].numDofs();
@@ -976,6 +977,32 @@ PetscErrorCode AppCtx::allocPetscObjs()
   //ierr = SNESLineSearchSet(snes_m, SNESLineSearchNo, &user); CHKERRQ(ierr);
 
 
+//  nnz.clear();
+//  {
+//    nnz.resize(n_unknowns_fs,0);
+//    std::vector<SetVector<int> > tabla;
+//    dof_handler[DH_UNKM].getSparsityTable(tabla); // TODO: melhorar desempenho, função mt lenta
+      //FEP_PRAGMA_OMP(parallel for)
+//      for (int i = 0; i < n_unknowns_fs; ++i)
+//        nnz[i] = tabla[i].size();
+//  }
+  if (false){
+    //Mat Mat_Jac;
+    ierr = MatCreate(PETSC_COMM_WORLD, &Mat_Jac);                                      CHKERRQ(ierr);
+    ierr = MatSetSizes(Mat_Jac, PETSC_DECIDE, PETSC_DECIDE, n_unknowns, n_unknowns);   CHKERRQ(ierr);
+    ierr = MatSetFromOptions(Mat_Jac);                                                 CHKERRQ(ierr);
+    ierr = MatSeqAIJSetPreallocation(Mat_Jac, 0, nnz.data());                          CHKERRQ(ierr);
+    ierr = MatSetOption(Mat_Jac,MAT_NEW_NONZERO_ALLOCATION_ERR,PETSC_FALSE);           CHKERRQ(ierr);
+    ierr = SNESCreate(PETSC_COMM_WORLD, &snes);                                        CHKERRQ(ierr);
+    ierr = SNESSetFunction(snes, Vec_res, FormFunction, this);                         CHKERRQ(ierr);
+    ierr = SNESSetJacobian(snes, Mat_Jac, Mat_Jac, FormJacobian, this);                CHKERRQ(ierr);
+    ierr = SNESSetConvergenceTest(snes,CheckSnesConvergence,this,PETSC_NULL);          CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes,&ksp);                                                  CHKERRQ(ierr);
+    ierr = KSPGetPC(ksp,&pc);                                                      CHKERRQ(ierr);
+    ierr = KSPSetOperators(ksp,Mat_Jac,Mat_Jac,SAME_NONZERO_PATTERN);              CHKERRQ(ierr);
+
+    ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
+  }
 
   printf(" done.\n");
   PetscFunctionReturn(0);

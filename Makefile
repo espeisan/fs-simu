@@ -4,7 +4,8 @@ OBJECTS	+= main.o conditions.o mesh.o residue.o
 #PETSC_ARCH=arch-linux2-cxx-debug
 #PETSC_ARCH =arch-linux2-cxx-opt-cluster
 PETSC_ARCH = arch-linux2-cxx-opt
-FEPIC_DIR = /home/stevens/Documentos/USP/Proyecto/cluster/espeisan/libs/FEPiCpp
+#FEPIC_DIR = /home/stevens/Documentos/USP/Proyecto/cluster/espeisan/libs/FEPiCpp
+FEPIC_DIR = /home/stevens/Documentos/repos/fepicpp/FEPiCpp
 PETSC_DIR = /home/stevens/Documentos/USP/Proyecto/cluster/espeisan/libs/petsc/petsc-3.4.4
 #PETSC_DIR = /home/stevens/Documentos/USP/Proyecto/cluster/espeisan/libs/petsc/petsc-3.6.2
 
