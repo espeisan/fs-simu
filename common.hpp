@@ -595,12 +595,12 @@ public:
   std::vector<Real>    mesh_sizes;
 
   // petsc vectors
-  Vec                 Vec_res, Vec_up_0, Vec_up_1,Vec_dup, Vec_normal/**/, Vec_uzp_0, Vec_uzp_1, Vec_duzp;
+  Vec                 Vec_res, Vec_up_0, Vec_up_1,Vec_dup, Vec_normal/**/, Vec_uzp_0, Vec_uzp_1, Vec_duzp, Vec_res_fs;
   Vec                 Vec_dup_0; // for bdf3
-  Mat                 Mat_Jac;
-  SNES                snes;         /* nonlinear solver context */
-  KSP    			        ksp;
-  PC	   			        pc;
+  Mat                 Mat_Jac, Mat_Jac_fs;
+  SNES                snes, snes_fs;         /* nonlinear solver context */
+  KSP    			        ksp, ksp_fs;
+  PC	   			        pc, pc_fs;
 
   // mesh
   Mat                 Mat_Jac_m;

@@ -986,23 +986,23 @@ PetscErrorCode AppCtx::allocPetscObjs()
 //      for (int i = 0; i < n_unknowns_fs; ++i)
 //        nnz[i] = tabla[i].size();
 //  }
-  if (false){
+//  if (false){
     //Mat Mat_Jac;
-    ierr = MatCreate(PETSC_COMM_WORLD, &Mat_Jac);                                      CHKERRQ(ierr);
-    ierr = MatSetSizes(Mat_Jac, PETSC_DECIDE, PETSC_DECIDE, n_unknowns, n_unknowns);   CHKERRQ(ierr);
-    ierr = MatSetFromOptions(Mat_Jac);                                                 CHKERRQ(ierr);
-    ierr = MatSeqAIJSetPreallocation(Mat_Jac, 0, nnz.data());                          CHKERRQ(ierr);
-    ierr = MatSetOption(Mat_Jac,MAT_NEW_NONZERO_ALLOCATION_ERR,PETSC_FALSE);           CHKERRQ(ierr);
-    ierr = SNESCreate(PETSC_COMM_WORLD, &snes);                                        CHKERRQ(ierr);
-    ierr = SNESSetFunction(snes, Vec_res, FormFunction, this);                         CHKERRQ(ierr);
-    ierr = SNESSetJacobian(snes, Mat_Jac, Mat_Jac, FormJacobian, this);                CHKERRQ(ierr);
-    ierr = SNESSetConvergenceTest(snes,CheckSnesConvergence,this,PETSC_NULL);          CHKERRQ(ierr);
-    ierr = SNESGetKSP(snes,&ksp);                                                  CHKERRQ(ierr);
-    ierr = KSPGetPC(ksp,&pc);                                                      CHKERRQ(ierr);
-    ierr = KSPSetOperators(ksp,Mat_Jac,Mat_Jac,SAME_NONZERO_PATTERN);              CHKERRQ(ierr);
+    ierr = MatCreate(PETSC_COMM_WORLD, &Mat_Jac_fs);                                      CHKERRQ(ierr);
+    ierr = MatSetSizes(Mat_Jac_fs, PETSC_DECIDE, PETSC_DECIDE, n_unknowns_fs, n_unknowns_fs);   CHKERRQ(ierr);
+    ierr = MatSetFromOptions(Mat_Jac_fs);                                                 CHKERRQ(ierr);
+//    ierr = MatSeqAIJSetPreallocation(Mat_Jac, 0, nnz.data());                          CHKERRQ(ierr);
+    ierr = MatSetOption(Mat_Jac_fs,MAT_NEW_NONZERO_ALLOCATION_ERR,PETSC_FALSE);           CHKERRQ(ierr);
+    ierr = SNESCreate(PETSC_COMM_WORLD, &snes_fs);                                        CHKERRQ(ierr);
+//    ierr = SNESSetFunction(snes_fs, Vec_res_fs, FormFunction, this);                         CHKERRQ(ierr);
+//    ierr = SNESSetJacobian(snes_fs, Mat_Jac_fs, Mat_Jac_fs, FormJacobian, this);                CHKERRQ(ierr);
+    ierr = SNESSetConvergenceTest(snes_fs,CheckSnesConvergence,this,PETSC_NULL);          CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes_fs,&ksp_fs);                                                  CHKERRQ(ierr);
+    ierr = KSPGetPC(ksp_fs,&pc_fs);                                                      CHKERRQ(ierr);
+    ierr = KSPSetOperators(ksp_fs,Mat_Jac_fs,Mat_Jac_fs,SAME_NONZERO_PATTERN);              CHKERRQ(ierr);
 
-    ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
-  }
+    ierr = SNESSetFromOptions(snes_fs); CHKERRQ(ierr);
+//  }
 
   printf(" done.\n");
   PetscFunctionReturn(0);
