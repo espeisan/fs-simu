@@ -569,6 +569,7 @@ public:
   int           n_dofs_q_per_facet;
   int           n_dofs_q_per_corner;
   
+  int           N_Solids;
   // mesh alias
   int           n_nodes;
   int           n_cells;

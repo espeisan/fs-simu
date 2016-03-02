@@ -367,7 +367,7 @@ bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
 	flusoli_tags.resize(nmax);
   else
 	flusoli_tags.clear();
-  //cout << nmax << endl;  for (int Ii = 0; Ii < nmax; Ii++) {cout << flusol_tags[Ii] << " ";}
+  N_Solids = flusoli_tags.size();
 
   fluidonly_tags.resize(16);  //cout << flusol_tags.max_size() << endl;
   nmax = fluidonly_tags.size();
@@ -744,11 +744,15 @@ void AppCtx::dofsUpdate()
   }
   dof_handler[DH_UNKS].linkDofs(dofs1.size(), dofs1.data(), dofs2.data());
   n_unknowns = dof_handler[DH_UNKS].numDofs();
-  dof_handler[DH_UNKM].linkDofs(dofs1.size(), dofs1.data(), dofs2.data());
-  n_unknowns_fs = dof_handler[DH_UNKM].numDofs();
 
   dof_handler[DH_MESH].SetUp();
   n_dofs_v_mesh = dof_handler[DH_MESH].numDofs();
+
+  dof_handler[DH_UNKM].linkDofs(dofs1.size(), dofs1.data(), dofs2.data());
+  n_unknowns_fs = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs()
+//		         +dof_handler[DH_UNKM].getVariable(VAR_Z).numPositiveDofs()/3
+		         +flusoli_tags.size()*3
+		         +dof_handler[DH_UNKM].getVariable(VAR_Q).numPositiveDofs();
 }
 
 PetscErrorCode AppCtx::allocPetscObjs()
@@ -991,7 +995,7 @@ PetscErrorCode AppCtx::allocPetscObjs()
     ierr = MatCreate(PETSC_COMM_WORLD, &Mat_Jac_fs);                                      CHKERRQ(ierr);
     ierr = MatSetSizes(Mat_Jac_fs, PETSC_DECIDE, PETSC_DECIDE, n_unknowns_fs, n_unknowns_fs);   CHKERRQ(ierr);
     ierr = MatSetFromOptions(Mat_Jac_fs);                                                 CHKERRQ(ierr);
-//    ierr = MatSeqAIJSetPreallocation(Mat_Jac, 0, nnz.data());                          CHKERRQ(ierr);
+    ierr = MatSeqAIJSetPreallocation(Mat_Jac_fs, PETSC_DEFAULT, NULL);                          CHKERRQ(ierr);
     ierr = MatSetOption(Mat_Jac_fs,MAT_NEW_NONZERO_ALLOCATION_ERR,PETSC_FALSE);           CHKERRQ(ierr);
     ierr = SNESCreate(PETSC_COMM_WORLD, &snes_fs);                                        CHKERRQ(ierr);
 //    ierr = SNESSetFunction(snes_fs, Vec_res_fs, FormFunction, this);                         CHKERRQ(ierr);
@@ -1064,6 +1068,70 @@ void AppCtx::matrixColoring()
   Assembly(Mat_Jac); //MatView(Mat_Jac,PETSC_VIEWER_STDOUT_WORLD); // Allocating matrix with (zero) entries according to shape functions contribution
   //MatSetOption(Mat_Jac,MAT_NEW_NONZERO_LOCATIONS,PETSC_FALSE);
   //MatSetOption(Mat_Jac,MAT_NEW_NONZERO_LOCATION_ERR,PETSC_TRUE);
+
+  VectorXi                     mapF_c(n_dofs_u_per_cell);
+  VectorXi                     mapF_f(n_dofs_u_per_facet);
+  VectorXi                     mapF_r(n_dofs_u_per_corner);
+  VectorXi                     mapZ_c(nodes_per_cell*3);
+  VectorXi                     mapZ_f(nodes_per_facet*3);
+  VectorXi                     mapZ_r(3);
+  VectorXi                     mapQ_c(n_dofs_p_per_cell);
+  VectorXi                     mapQ_f(n_dofs_p_per_facet);
+  VectorXi                     mapQ_r(n_dofs_p_per_corner);
+
+  VectorXi p_id_cor(3); p_id_cor << 1,1,1;
+  int n_solid_nodes = dof_handler[DH_UNKM].getVariable(VAR_Z).numPositiveDofs()/3;
+  p_id_cor = 3*(n_solid_nodes-N_Solids)*p_id_cor;
+  // mesh velocity
+//  VectorXi                     mapM_c(dim*nodes_per_cell);
+//  VectorXi                     mapM_f(dim*nodes_per_facet);
+//  VectorXi                     mapM_r(dim*nodes_per_corner);
+
+  MatrixXd Afsloc = MatrixXd::Zero(n_dofs_u_per_cell, n_dofs_u_per_cell);
+  MatrixXd Dfsloc = MatrixXd::Zero(n_dofs_p_per_cell, n_dofs_u_per_cell);
+  MatrixXd Gfsloc = MatrixXd::Zero(n_dofs_u_per_cell, n_dofs_p_per_cell);
+  MatrixXd Efsloc = MatrixXd::Zero(n_dofs_p_per_cell, n_dofs_p_per_cell);
+
+  MatrixXd Z1fsloc = MatrixXd::Zero(n_dofs_u_per_cell,3);
+  MatrixXd Z2fsloc = MatrixXd::Zero(3,n_dofs_u_per_cell);
+  MatrixXd Z3fsloc = MatrixXd::Zero(3,3);
+  MatrixXd Z4fsloc = MatrixXd::Zero(3,n_dofs_p_per_cell);
+  MatrixXd Z5fsloc = MatrixXd::Zero(n_dofs_p_per_cell,3);
+
+  cell = mesh->cellBegin();
+//  cell_iterator cell_end = mesh->cellEnd();
+  for (; cell != cell_end; ++cell)
+  {
+	//for (int L = 0; L < 3; L++){
+	//  nodid = cell->getNodeId(L);
+	//  cout << nodid << " ";
+	//}
+	//cout << endl;
+    // mapeamento do local para o global:
+    dof_handler[DH_UNKM].getVariable(VAR_U).getCellDofs(mapF_c.data(), &*cell);  // U global ids for the current cell
+    dof_handler[DH_UNKM].getVariable(VAR_Z).getCellDofs(mapZ_c.data(), &*cell);  // P global ids for the current cell
+    dof_handler[DH_UNKM].getVariable(VAR_Q).getCellDofs(mapQ_c.data(), &*cell);  // P global ids for the current cell
+    mapQ_c = mapQ_c - p_id_cor;
+    cout << endl << mapF_c << endl << endl << mapZ_c << endl << endl << mapQ_c << endl;
+    MatSetValues(Mat_Jac_fs, mapF_c.size(), mapF_c.data(), mapF_c.size(), mapF_c.data(), Afsloc.data(), ADD_VALUES);
+    MatSetValues(Mat_Jac_fs, mapF_c.size(), mapF_c.data(), mapQ_c.size(), mapQ_c.data(), Gfsloc.data(), ADD_VALUES);
+    MatSetValues(Mat_Jac_fs, mapQ_c.size(), mapQ_c.data(), mapF_c.size(), mapF_c.data(), Dfsloc.data(), ADD_VALUES);
+    MatSetValues(Mat_Jac_fs, mapQ_c.size(), mapQ_c.data(), mapQ_c.size(), mapQ_c.data(), Efsloc.data(), ADD_VALUES);
+    //std::cout << Aloc << std::endl << std::endl << Dloc << std::endl << std::endl << Gloc << std::endl << std::endl << Eloc << std::endl;
+  }
+
+  point_iterator poi = mesh->pointBegin();
+  point_iterator poi_end = mesh->pointEnd();
+  //for (; poi != poi_end; ++poi){
+  for (int l = 0; l < 60; l++){
+	dof_handler[DH_UNKM].getVariable(VAR_U).getVertexDofs(mapF_r.data(), l);//&*poi);
+	dof_handler[DH_UNKM].getVariable(VAR_Z).getVertexDofs(mapZ_r.data(), l);//&*poi);
+	dof_handler[DH_UNKM].getVariable(VAR_Q).getVertexDofs(mapQ_r.data(), l);//&*poi);
+	//cout << endl << mapF_r << endl << endl << mapZ_r << endl << endl << mapQ_r << endl;
+  }
+
+  Assembly(Mat_Jac_fs);
+
   printf(" done. \n");
 }
 
@@ -3169,12 +3237,14 @@ int main(int argc, char **argv)
   cout << endl; cout << "mesh: " << user.filename << endl;
   user.mesh->printInfo();
   cout << "\n# velocity unknowns: " << user.dof_handler[DH_UNKS].getVariable(VAR_U).numPositiveDofs();
-  cout << "\n# pressure unknowns: " << user.dof_handler[DH_UNKS].getVariable(VAR_P).numPositiveDofs() << endl;
+  cout << "\n# pressure unknowns: " << user.dof_handler[DH_UNKS].getVariable(VAR_P).numPositiveDofs();
+  cout << "\n# total unknowns: " << user.n_unknowns << endl;
   if (!user.fluidonly_tags.empty() && (user.dim == 2)){
     cout << "\n# velocity fluid only unknowns: " << user.dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs();
-    cout << "\n# velocity solid int unknowns: " << user.dof_handler[DH_UNKM].getVariable(VAR_Z).numPositiveDofs();
+    cout << "\n# velocity solid int unknowns: " << user.flusoli_tags.size()*3 << " (" <<
+    		                                       user.dof_handler[DH_UNKM].getVariable(VAR_Z).numPositiveDofs()/3 << ")";
     cout << "\n# pressure unknowns: " << user.dof_handler[DH_UNKM].getVariable(VAR_Q).numPositiveDofs();
-    //cout << "\n# total unknowns: " << user.
+    cout << "\n# total unknowns: " << user.n_unknowns_fs;
   }
   cout << endl;
   user.mesh->printStatistics();

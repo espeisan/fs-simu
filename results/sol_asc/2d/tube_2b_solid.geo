@@ -5,10 +5,10 @@
 
 L=1.00;    				// Global scale factor
 lc = 0.3; //L/5;				// Factor for the mesh refinement
-width  = 1*L;			// Tube width
-height = 2;//3*L;			// Tube height
+width  = 1;//1*L;			// Tube width
+height = 4;//3*L;			// Tube height
 R = 0.2*L; 				// Radius of the bubbles
-N = 3;					// Number of bubbles in the tube
+N = 6;					// Number of bubbles in the tube
 
 // Comment : Here you can give the exact coordinates of the central points 
 // of the bubbles
@@ -32,11 +32,11 @@ physicalTagWall_l = 1;
 physicalTagWall_r = 2;
 physicalTagWall_t = 3;
 physicalTagWall_b = 4;
-physicalTagSurfaceBubble = 5;
-physicalTagOutsideBubble = 100;
-physicalTagInsideBubble = 200;
-physicalTagFixedPoints = 33;
-
+physicalTagFixedPoints = 5;
+physicalTagOutsideBubble = 6;
+//physicalTagSurfaceBubble = 5;
+//physicalTagInsideBubble = 200;
+physBegin = 100;  //Solid physical tag starts at 100+1, until 100+N
 // ---------------------------------------------------------------------
 // ----------------------- Automatic part of the file ------------------
 // DO NOT CHANGE AFTER HERE
@@ -58,8 +58,9 @@ For t In {1:N}
 	Line Loop(t) = {2*t-1,2*t};
 EndFor
 
-Physical Line(physicalTagSurfaceBubble) = {1:2*N};
-
+For t In {1:N}
+	Physical Line(physBegin+t) = {2*t,2*t-1};
+EndFor
 
 // --------------- Defining the geometry of tube -----------------------
 // Points
@@ -78,8 +79,8 @@ Line Loop(N+1) = {2*N+1:2*N+4};
 
 Physical Line(physicalTagWall_l) = {2*N+4};
 Physical Line(physicalTagWall_r) = {2*N+2};
-Physical Line(physicalTagWall_t) = {2*N+3};
-Physical Line(physicalTagWall_b) = {2*N+1};
+Physical Line(physicalTagWall_b) = {2*N+3};
+Physical Line(physicalTagWall_t) = {2*N+1};
 
 // ------------- Defining the surface mesh -----------------------------
 // Fluid outside the bubbles
@@ -94,6 +95,6 @@ Physical Surface(physicalTagOutsideBubble) = {1};
 //Physical Surface(physicalTagInsideBubble) = {2:N+1};
 Physical Point(physicalTagFixedPoints) = {3*N+1:3*N+4};
 
-Reverse Surface { 1:6 };
+//Reverse Surface { 1:6 };
 
 
