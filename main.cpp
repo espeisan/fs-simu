@@ -688,6 +688,8 @@ void AppCtx::dofsUpdate()
 
   std::vector<int> dofs1;
   std::vector<int> dofs2;
+  NN_Solids.assign(N_Solids,0);
+  int tag, nod_id;
 
   int dofs_a[10];
   int dofs_b[10];
@@ -706,6 +708,10 @@ void AppCtx::dofsUpdate()
 
       for (; point1 != point1_end; ++point1)
       {
+    	tag = point1->getTag();
+    	nod_id = is_in_id(tag,flusoli_tags);
+    	if (nod_id) NN_Solids[nod_id-1]++;
+
         for (int i = 0; i < (int)periodic_tags.size(); i+=2)
         {
 
@@ -753,6 +759,9 @@ void AppCtx::dofsUpdate()
 //		         +dof_handler[DH_UNKM].getVariable(VAR_Z).numPositiveDofs()/3
 		         +flusoli_tags.size()*3
 		         +dof_handler[DH_UNKM].getVariable(VAR_Q).numPositiveDofs();
+
+  //for (unsigned int l = 0; l < NN_Solids.size(); l++) cout << NN_Solids[l] << " ";
+  //cout << endl;
 }
 
 PetscErrorCode AppCtx::allocPetscObjs()
@@ -766,6 +775,11 @@ PetscErrorCode AppCtx::allocPetscObjs()
   ierr = VecCreate(PETSC_COMM_WORLD, &Vec_res);                     CHKERRQ(ierr);  //creating Vec_res empty PETSc vector
   ierr = VecSetSizes(Vec_res, PETSC_DECIDE, n_unknowns);            CHKERRQ(ierr);
   ierr = VecSetFromOptions(Vec_res);                                CHKERRQ(ierr);
+
+  //Vec Vec_res;
+  ierr = VecCreate(PETSC_COMM_WORLD, &Vec_res_fs);                     CHKERRQ(ierr);  //creating Vec_res empty PETSc vector
+  ierr = VecSetSizes(Vec_res_fs, PETSC_DECIDE, n_unknowns_fs);            CHKERRQ(ierr);
+  ierr = VecSetFromOptions(Vec_res_fs);                                CHKERRQ(ierr);
 
   //Vec Vec_up_0;
   ierr = VecCreate(PETSC_COMM_WORLD, &Vec_up_0);                      CHKERRQ(ierr);
@@ -809,6 +823,11 @@ PetscErrorCode AppCtx::allocPetscObjs()
   ierr = VecCreate(PETSC_COMM_WORLD, &Vec_v_mid);                  CHKERRQ(ierr);
   ierr = VecSetSizes(Vec_v_mid, PETSC_DECIDE, n_dofs_v_mesh);      CHKERRQ(ierr);
   ierr = VecSetFromOptions(Vec_v_mid);                             CHKERRQ(ierr);
+
+  //Vec Vec_v_mid_fs
+  ierr = VecCreate(PETSC_COMM_WORLD, &Vec_v_mid_fs);                  CHKERRQ(ierr);
+  ierr = VecSetSizes(Vec_v_mid_fs, PETSC_DECIDE, n_dofs_v_mesh);      CHKERRQ(ierr);
+  ierr = VecSetFromOptions(Vec_v_mid_fs);                             CHKERRQ(ierr);
 
   //Vec Vec_v_1
   ierr = VecCreate(PETSC_COMM_WORLD, &Vec_v_1);                  CHKERRQ(ierr);
@@ -1428,12 +1447,13 @@ PetscErrorCode AppCtx::setInitialConditions()
 {
   PetscErrorCode      ierr(0);
 
-  Vector    Uf(dim);
+  Vector    Uf(dim), Zf(3);
   //double    pf;
   Vector    X(dim);
   Tensor    R(dim,dim);
   VectorXi  dofs(dim);  //global components unknowns enumeration from point dofs
-  //int       dof;
+  VectorXi  dofs_fs(3);
+  int       nod_id;
   int tag;
   //PetscInt size1,size2,size3,size4,size5,size6,size7;
   current_time = 0;
@@ -1499,7 +1519,7 @@ PetscErrorCode AppCtx::setInitialConditions()
       ++counter[edge_nodes[1]];
 
     } // end n_edges_total
-
+//cout << mesh_sizes[2] << " " << mesh_sizes[3] << endl;
 
   } // end compute mesh sizes
 
@@ -1511,13 +1531,12 @@ PetscErrorCode AppCtx::setInitialConditions()
   for (; point != point_end; ++point)
   {
     tag = point->getTag();
-
     point->getCoord(X.data(),dim);
 
+    // vel
     Uf = u_initial(X, tag);
-
+    Zf = z_initial(X, tag);
     getNodeDofs(&*point,DH_UNKS,VAR_U,dofs.data());
-
     VecSetValues(Vec_up_0, dim, dofs.data(), Uf.data(), INSERT_VALUES);
 
     // press
@@ -1528,17 +1547,33 @@ PetscErrorCode AppCtx::setInitialConditions()
       VecSetValues(Vec_up_0, 1, dofs.data(), &p_in, INSERT_VALUES);
     }
 
+    nod_id = is_in_id(tag,flusoli_tags);
+    if (nod_id){
+      getNodeDofs(&*point,DH_UNKM,VAR_Z,dofs_fs.data());
+      for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
+        dofs_fs(l) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
+      			                         + 3*nod_id - 2 + l;
+      }
+      VecSetValues(Vec_uzp_0, 3, dofs_fs.data(), Zf.data(), INSERT_VALUES);  //cout << endl << dofs_fs << endl;
+    }
+    else{
+      getNodeDofs(&*point,DH_UNKM,VAR_U,dofs.data());
+      VecSetValues(Vec_uzp_0, dim, dofs.data(), Uf.data(), INSERT_VALUES);  //cout << endl << dofs << endl;
+    }
 
   } // end point loop
 
 //PetscInt size1;
   Assembly(Vec_up_0);  //VecView(Vec_up_0,PETSC_VIEWER_STDOUT_WORLD);  //vel_unk + pres_unk //VecGetSize(Vec_up_0,&size1);
   VecCopy(Vec_up_0,Vec_up_1);
+  Assembly(Vec_uzp_0);  //VecView(Vec_uzp_0,PETSC_VIEWER_STDOUT_WORLD);  //u_unk+z_unk+p_unk //VecGetSize(Vec_up_0,&size1);
+  VecCopy(Vec_uzp_0,Vec_uzp_1);
 
   // remember: Vec_normals follows the Vec_x_1
 
   //moveMesh(Vec_x_0, Vec_up_0, Vec_up_1, 1.0, tt, Vec_x_1);
-  calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.0, Vec_v_mid, 0.0);  // Vec_up_0 = Vec_up_1, vtheta = 1.0, mean b.c. = Vec_up_1 = Vec_v_mid init. guess SNESSolve
+  if (false) calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.0, Vec_v_mid, 0.0);  // Vec_up_0 = Vec_up_1, vtheta = 1.0, mean b.c. = Vec_up_1 = Vec_v_mid init. guess SNESSolve
+  calcMeshVelocity(Vec_x_0, Vec_uzp_0, Vec_uzp_1, 1.0, Vec_v_mid, 0.0);  // Vec_up_0 = Vec_up_1, vtheta = 1.0, mean b.c. = Vec_up_1 = Vec_v_mid init. guess SNESSolve
   // move the mesh
   VecWAXPY(Vec_x_1, dt, Vec_v_mid, Vec_x_0); // Vec_x_1 = Vec_v_mid*dt + Vec_x_0 // for zero Dir. cond. solution lin. elast. is Vec_v_mid = 0
   //VecView(Vec_up_0,PETSC_VIEWER_STDOUT_WORLD);
@@ -2476,11 +2511,11 @@ void AppCtx::computeError(Vec const& Vec_x, Vec &Vec_up, double tt)
 
       //  note: norm(u, H1)^2 = norm(u, L2)^2 + norm(gradLphi_c, L2)^2
       u_L2_norm        += (u_exact(Xqp, tt, tag) - Uqp).squaredNorm()*JxW;
-      p_L2_norm        += sqr(pressure_exact(Xqp, tt, tag) - Pqp)*JxW;
+      p_L2_norm        += sqr(p_exact(Xqp, tt, tag) - Pqp)*JxW;
       grad_u_L2_norm   += (grad_u_exact(Xqp, tt, tag) - dxU).squaredNorm()*JxW;
       grad_p_L2_norm   += (grad_p_exact(Xqp, tt, tag) - dxP).squaredNorm()*JxW;
       u_inf_norm       = max(u_inf_norm, (u_exact(Xqp, tt, tag) - Uqp).norm());
-      p_inf_norm       = max(p_inf_norm, fabs(pressure_exact(Xqp, tt, tag) - Pqp));
+      p_inf_norm       = max(p_inf_norm, fabs(p_exact(Xqp, tt, tag) - Pqp));
 
       volume += JxW;
     } // fim quadratura
@@ -2709,6 +2744,74 @@ double AppCtx::getMeshVolume()
   } // end elementos
   return volume;
 }
+
+Vector AppCtx::getAreaMassCenterSolid(int sol_id){
+  std::vector<Vector2d> XP;
+  Vector Xp(dim);
+  int tag, nod_id;
+  int NS = NN_Solids[sol_id-1];
+  point_iterator point = mesh->pointBegin();
+  point_iterator point_end = mesh->pointEnd();
+  //capture the boundary nodes
+  for (; point != point_end; ++point){
+	tag = point->getTag();
+	nod_id = is_in_id(tag,flusoli_tags);
+	if (nod_id == sol_id){
+	  point->getCoord(Xp.data(),dim);
+      XP.push_back(Xp);
+	}
+  }
+  XP.resize(NS);
+  //ordering the point cloud XP
+  std::vector<Vector2d> XPO;
+  XPO = ConvexHull2d(XP);
+  XPO.push_back(XPO[0]);
+  //for (int j = 0; j < NN_Solids[sol_id-1]+1; j++)
+//    cout << XPO[j].transpose() << "   ";
+//  cout << endl;
+
+  //area
+  double A = 0;
+  for (int i = 0; i < NS; i++){
+    A = A + XPO[i](0)*XPO[i+1](1) - XPO[i+1](0)*XPO[i](1);
+  }
+  A = 0.5*A;
+  //mass center
+  Vector CM(dim);
+  CM = Vector::Zero(2);
+  for (int i = 0; i < NS; i++){
+    CM(0) = CM(0) + (XPO[i](0) + XPO[i+1](0))*(XPO[i](0)*XPO[i+1](1) - XPO[i+1](0)*XPO[i](1));
+	CM(1) = CM(1) + (XPO[i](1) + XPO[i+1](1))*(XPO[i](0)*XPO[i+1](1) - XPO[i+1](0)*XPO[i](1));
+  }
+  CM(0) = CM(0)/(6*A);
+  CM(1) = CM(1)/(6*A);
+  //cout << CM.transpose() << endl;
+  return CM;
+}
+
+std::vector<Vector2d> AppCtx::ConvexHull2d(std::vector<Vector2d> & LI){
+  int N = LI.size(), k = 0;
+  std::vector<Vector2d> H(2*N);
+  //lexicographically
+  std::sort(LI.begin(),LI.end(),lessVector);
+//  for (unsigned int j = 0; j < LI.size(); j++)
+//	  cout << LI[j].transpose() << "   ";
+//  cout << endl;
+  // Build lower hull
+  for (int i = 0; i < N; ++i) {
+    while (k >= 2 && cross2d(H[k-2], H[k-1], LI[i]) <= 0) k--;
+    H[k++] = LI[i];
+  }
+  // Build upper hull
+  for (int i = N-2, t = k+1; i >= 0; i--) {
+    while (k >= t && cross2d(H[k-2], H[k-1], LI[i]) <= 0) k--;
+    H[k++] = LI[i];
+  }
+
+  H.resize(k);
+  return H;
+}
+
 
 // TODO Only for 2D !!!!!!!!!!!!!!!!!!
 void AppCtx::printContactAngle(bool _print)

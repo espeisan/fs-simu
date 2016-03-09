@@ -1181,22 +1181,43 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
   {
     VectorXi    node_dofs_mesh(dim);
     VectorXi    node_dofs_fluid(dim);
-    int tag;
 
-    Vector      U0(dim);
+    VectorXi    node_dofs_fluid_fs(dim);
+    VectorXi    node_dofs_solid_fs(3);
+
+    Vector      Xp(dim), Xg(dim);
+
+    int tag, nod_id;
+
+    Vector      U0(dim), U0_fs(3);
     Vector      X0(dim), Y0(dim);
-    Vector      U1(dim);
-    Vector      tmp(dim);
+    Vector      U1(dim), U1_fs(3);
+    Vector      tmp(dim), tmp_fs(3);
+    Vector2d    tmp_n;
     Vector      k1(dim),k2(dim),k3(dim),k4(dim); //  RK4
 
     point_iterator point = mesh->pointBegin();
     point_iterator point_end = mesh->pointEnd();
-    for (; point != point_end; ++point)  //to calculate Vec_v_mid for each point
+    for (; point != point_end; ++point)  //to calculate Vec_v_mid at each point
     {
       tag = point->getTag();
 
       getNodeDofs(&*point, DH_MESH, VAR_M, node_dofs_mesh.data());
       getNodeDofs(&*point, DH_UNKS, VAR_U, node_dofs_fluid.data());
+
+      if (!fluidonly_tags.empty() && (dim == 2)){
+        nod_id = is_in_id(tag,flusoli_tags);
+        if (nod_id){
+          //getNodeDofs(&*point, DH_UNKM, VAR_Z, node_dofs_solid_fs.data());
+          for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
+            node_dofs_solid_fs(l) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
+          			                         + 3*nod_id - 2 + l;
+          }
+        }
+        else{
+          getNodeDofs(&*point, DH_UNKM, VAR_U, node_dofs_fluid_fs.data());
+        }
+      }
 
       VecGetValues(Vec_x_0, dim, node_dofs_mesh.data(), X0.data());
 
@@ -1242,25 +1263,6 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
         else
           tmp = (Y0 - X0)/dt;
 
-        //tmp = v_exact(X0,tt,tag);
-    
-        //tmp = k1;
-
-        
-        //if (!mesh->isVertex(&*point)) // APAGAR TEMP ERASE-ME ... este codigo é só para não entortar a malha
-        //{
-        //  int vtcs[3];
-        //  const int m = point->getPosition() - mesh->numVerticesPerCell();
-        //  Cell const* cell = mesh->getCellPtr(point->getIncidCell());
-        //  if (dim==3)
-        //    cell->getCornerVerticesId(m, vtcs);
-        //  else
-        //    cell->getFacetVerticesId(m, vtcs);
-        //  if (mesh->inBoundary(mesh->getNodePtr(vtcs[0])) || mesh->inBoundary(mesh->getNodePtr(vtcs[1])))
-        //    tmp = tmp / 2.;
-        //  if (mesh->inBoundary(mesh->getNodePtr(vtcs[0])) && mesh->inBoundary(mesh->getNodePtr(vtcs[1])))
-        //    tmp = tmp * 0.;
-        //}
         VecSetValues(Vec_v_mid, dim, node_dofs_mesh.data(), tmp.data(), INSERT_VALUES);
       }  //if for RK4
       else
@@ -1277,9 +1279,26 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
         {
           VecGetValues(Vec_up_0,  dim, node_dofs_fluid.data(), U0.data());
           VecGetValues(Vec_up_1,  dim, node_dofs_fluid.data(), U1.data());
-//PetscReal nrm;  Vector difff;  difff = U0-U1;
-          tmp = vtheta*U1 + (1.-vtheta)*U0;  //VecNorm(difff,NORM_2,&nrm);  cout << "\n" << nrm << endl;
-          VecSetValues(Vec_v_mid, dim, node_dofs_mesh.data(), tmp.data(), INSERT_VALUES);
+          tmp = vtheta*U1 + (1.-vtheta)*U0;
+
+//          VecSetValues(Vec_v_mid, dim, node_dofs_mesh.data(), tmp.data(), INSERT_VALUES);
+          if (!fluidonly_tags.empty() && (dim == 2)){
+            if (nod_id){
+              VecGetValues(Vec_up_0,  3, node_dofs_solid_fs.data(), U0_fs.data());
+              VecGetValues(Vec_up_1,  3, node_dofs_solid_fs.data(), U1_fs.data());
+              tmp_fs = vtheta*U1_fs + (1.-vtheta)*U0_fs;
+              point->getCoord(Xp.data(),dim);  //coords node1 of current edge
+              Xg = getAreaMassCenterSolid(nod_id);
+              tmp_n = SolidVel(Xp,Xg,tmp_fs);
+              VecSetValues(Vec_v_mid, dim, node_dofs_mesh.data(), tmp_n.data(), INSERT_VALUES);
+            }
+            else{
+              VecGetValues(Vec_up_0,  dim, node_dofs_fluid.data(), U0.data());
+              VecGetValues(Vec_up_1,  dim, node_dofs_fluid.data(), U1.data());
+              tmp = vtheta*U1 + (1.-vtheta)*U0;  //VecNorm(difff,NORM_2,&nrm);  cout << "\n" << nrm << endl;
+              VecSetValues(Vec_v_mid, dim, node_dofs_mesh.data(), tmp.data(), INSERT_VALUES);
+            }
+          }
         }
 
       } // if force_mesh_velocity

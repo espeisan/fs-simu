@@ -75,6 +75,17 @@ bool is_in(T value, Vec const& v)
   return false;
 }
 
+template<class Vec, class T>
+int is_in_id(T value, Vec const& v)
+{
+  for (int i = 0; i < (int)v.size(); i++)
+  {
+    if (value==v[i])
+      return i+1;
+  }
+  return 0;
+}
+
 /* stabilization type */
 enum Behaviors {
 
@@ -95,12 +106,14 @@ double beta_diss();
 double muu(int tag);
 Vector force(Vector const& X, double t, int tag);
 Vector u_exact(Vector const& X, double t, int tag);
+Vector z_exact(Vector const& X, double t, int tag);
 Vector traction(Vector const& X, Vector const& normal, double t, int tag);
-double pressure_exact(Vector const& X, double t, int tag);
+double p_exact(Vector const& X, double t, int tag);
 Vector grad_p_exact(Vector const& X, double t, int tag);
 Tensor grad_u_exact(Vector const& X, double t, int tag);
 Vector u_initial(Vector const& X, int tag);
 double p_initial(Vector const& X, int tag);
+Vector z_initial(Vector const& X, int tag);
 Vector solid_normal(Vector const& X, double t, int tag);
 Vector v_exact(Vector const& X, double t, int tag);
 Vector solid_veloc(Vector const& X, double t, int tag);
@@ -233,6 +246,21 @@ inline void cross(Vector & c, Vector const& a, Vector const& b)
   c(1) = a(2)*b(0) - a(0)*b(2);
   c(2) = a(0)*b(1) - a(1)*b(0);
 
+}
+
+inline Vector2d SolidVel(Vector const& X, Vector const& Xg, Vector const& Z){
+  Vector2d R;
+  R(0) = Z(0) - Z(2)*(X(1)-Xg(1));
+  R(1) = Z(1) + Z(2)*(X(0)-Xg(0));
+
+  return R;
+}
+
+inline bool lessVector(Vector2d const& a, Vector2d const& b){
+  return (a(0) < b(0)) || ((a(0) == b(0)) && (a(1) < b(1)));
+}
+inline double cross2d(Vector2d const& o, Vector2d const& a, Vector2d const& b){
+  return (a(0)-o(0))*(b(1)-o(1)) - (a(1)-o(1))*(b(0)-o(0));
 }
 
 
@@ -383,7 +411,8 @@ public:
 
   void pressureTimeCorrection(Vec &Vec_up_0, Vec &Vec_up_1, double a, double b);
 
-
+  std::vector<Vector2d> ConvexHull2d(std::vector<Vector2d> & LI);  //counterclockwise
+  Vector getAreaMassCenterSolid(int solid);
   double getMeshVolume();
   double getMaxVelocity();
   void printContactAngle(bool _print);
@@ -570,6 +599,7 @@ public:
   int           n_dofs_q_per_corner;
   
   int           N_Solids;
+  std::vector<int>   NN_Solids;
   // mesh alias
   int           n_nodes;
   int           n_cells;
@@ -608,7 +638,7 @@ public:
   SNES                snes_m;
   KSP    			        ksp_m;
   PC	   			        pc_m;
-  Vec                 Vec_res_m, Vec_x_0, Vec_x_1, Vec_v_mid, Vec_v_1;
+  Vec                 Vec_res_m, Vec_x_0, Vec_x_1, Vec_v_mid, Vec_v_1/**/,Vec_res_m_fs, Vec_x_0_fs, Vec_x_1_fs, Vec_v_mid_fs, Vec_v_1_fs;
   Vec                 Vec_x_aux; // bdf3
   SNESLineSearch      linesearch;
   

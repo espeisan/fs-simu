@@ -15,12 +15,14 @@ double gama(Vector const& X, double t, int tag);
 double muu(int tag);
 Vector force(Vector const& X, double t, int tag);
 Vector u_exact(Vector const& X, double t, int tag);
-double pressure_exact(Vector const& X, double t, int tag);
+double p_exact(Vector const& X, double t, int tag);
+Vector z_exact(Vector const& X, double t, int tag);
 Tensor grad_u_exact(Vector const& X, double t, int tag);
 Vector grad_p_exact(Vector const& X, double t, int tag);
 Vector traction(Vector const& X, Vector const& normal, double t, int tag);
 Vector u_initial(Vector const& X, int tag);
 double p_initial(Vector const& X, int tag);
+Vector z_initial(Vector const& X, int tag);
 Vector solid_normal(Vector const& X, double t, int tag);
 Tensor feature_proj(Vector const& X, double t, int tag);
 
@@ -101,7 +103,7 @@ Tensor grad_u_exact(Vector const& X, double t, int tag)
   return dxU;
 }
 
-double pressure_exact(Vector const& X, double t, int tag)
+double p_exact(Vector const& X, double t, int tag)
 {
   double x = X(0);
   double y = X(1);
@@ -127,11 +129,11 @@ Vector grad_p_exact(Vector const& X, double t, int tag)
 Vector traction(Vector const& X, Vector const& normal, double t, int tag)
 {
   Vector T(Vector::Zero(X.size()));
-  //T(0) = -pressure_exact(X,t,tag);
+  //T(0) = -p_exact(X,t,tag);
   //T(1) = muu(tag)*(cos(w_*t) + sin(w_*t));
   Tensor dxU(grad_u_exact(X,t,tag));
   Tensor I(Tensor::Identity(2,2));
-  T = (- pressure_exact(X,t,tag)*I +  muu(tag)*(dxU + dxU.transpose()))*normal;
+  T = (- p_exact(X,t,tag)*I +  muu(tag)*(dxU + dxU.transpose()))*normal;
   return T;
 }
 
@@ -142,7 +144,7 @@ Vector u_initial(Vector const& X, int tag)
 
 double p_initial(Vector const& X, int tag)
 {
-  return pressure_exact(X,0,tag);
+  return p_exact(X,0,tag);
 }
 
 Vector solid_normal(Vector const& X, double t, int tag)
@@ -267,7 +269,14 @@ Tensor grad_u_exact(Vector const& X, double t, int tag)
   return dxU;
 }
 
-double pressure_exact(Vector const& X, double t, int tag)
+Vector z_exact(Vector const& X, double t, int tag)
+{
+  Vector v(Vector::Zero(3));
+  //v << 3.14, 722, 3.1416;
+  return v;
+}
+
+double p_exact(Vector const& X, double t, int tag)
 {
   double x = X(0);
   double y = X(1);
@@ -287,11 +296,11 @@ Vector grad_p_exact(Vector const& X, double t, int tag)
 Vector traction(Vector const& X, Vector const& normal, double t, int tag)
 {
   Vector T(Vector::Zero(X.size()));
-  //T(0) = -pressure_exact(X,t,tag);
+  //T(0) = -p_exact(X,t,tag);
   //T(1) = muu(tag)*(cos(w_*t) + sin(w_*t));
   Tensor dxU(grad_u_exact(X,t,tag));
   Tensor I(Tensor::Identity(2,2));
-  T = (- pressure_exact(X,t,tag)*I +  muu(tag)*(dxU + dxU.transpose()))*normal;
+  T = (- p_exact(X,t,tag)*I +  muu(tag)*(dxU + dxU.transpose()))*normal;
   return T;
 }
 
@@ -300,9 +309,14 @@ Vector u_initial(Vector const& X, int tag)
   return u_exact(X,0,tag);
 }
 
+Vector z_initial(Vector const& X, int tag)
+{
+  return z_exact(X,0,tag);
+}
+
 double p_initial(Vector const& X, int tag)
 {
-  return pressure_exact(X,0,tag);
+  return p_exact(X,0,tag);
 }
 
 Vector solid_normal(Vector const& X, double t, int tag)
@@ -411,7 +425,7 @@ Tensor grad_u_exact(Vector const& X, double t, int tag)
   return dxU;
 }
 
-double pressure_exact(Vector const& X, double t, int tag)
+double p_exact(Vector const& X, double t, int tag)
 {
   double x = X(0);
   double y = X(1);
@@ -431,11 +445,11 @@ Vector grad_p_exact(Vector const& X, double t, int tag)
 Vector traction(Vector const& X, Vector const& normal, double t, int tag)
 {
   Vector T(Vector::Zero(X.size()));
-  //T(0) = -pressure_exact(X,t,tag);
+  //T(0) = -p_exact(X,t,tag);
   //T(1) = muu(tag)*(cos(w_*t) + sin(w_*t));
   Tensor dxU(grad_u_exact(X,t,tag));
   Tensor I(Tensor::Identity(2,2));
-  T = (- pressure_exact(X,t,tag)*I +  muu(tag)*(dxU + dxU.transpose()))*normal;
+  T = (- p_exact(X,t,tag)*I +  muu(tag)*(dxU + dxU.transpose()))*normal;
   return T;
 }
 
@@ -446,7 +460,7 @@ Vector u_initial(Vector const& X, int tag)
 
 double p_initial(Vector const& X, int tag)
 {
-  return pressure_exact(X,0,tag);
+  return p_exact(X,0,tag);
 }
 
 Vector solid_normal(Vector const& X, double t, int tag)

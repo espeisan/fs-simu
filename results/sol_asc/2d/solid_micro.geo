@@ -37,3 +37,5 @@ Physical Surface(15) = {11};
 //Transfinite Surface {11};
 //Recombine Surface {12};
 //Recombine Surface {11};
+Physical Point(13) = {4, 3, 2, 1};
+Physical Point(14) = {7, 6, 9, 8};

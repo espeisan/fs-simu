@@ -219,7 +219,7 @@ PetscErrorCode AppCtx::formFunction(SNES /*snes*/, Vec Vec_up_k, Vec Vec_fun)
       X = .5*(X+X_new);
       dof_handler[DH_UNKS].getVariable(VAR_P).getVertexDofs(&null_space_press_dof, &*point);
       // fix the initial guess
-      VecSetValue(Vec_up_k, null_space_press_dof, pressure_exact(X,current_time+.5*dt,point->getTag()), INSERT_VALUES);
+      VecSetValue(Vec_up_k, null_space_press_dof, p_exact(X,current_time+.5*dt,point->getTag()), INSERT_VALUES);
     }
 
     Assembly(Vec_up_k);
