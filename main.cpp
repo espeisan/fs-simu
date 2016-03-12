@@ -28,6 +28,9 @@ PetscErrorCode CheckSnesConvergence(SNES snes, PetscInt it,PetscReal xnorm, Pets
 PetscErrorCode FormJacobian_mesh(SNES snes,Vec Vec_up_1,Mat *Mat_Jac, Mat *prejac, MatStructure *flag, void *ptr);
 PetscErrorCode FormFunction_mesh(SNES snes, Vec Vec_up_1, Vec Vec_fun, void *ptr);
 
+PetscErrorCode FormJacobian_fs(SNES snes,Vec Vec_up_1,Mat *Mat_Jac, Mat *prejac, MatStructure *flag, void *ptr);
+PetscErrorCode FormFunction_fs(SNES snes, Vec Vec_up_1, Vec Vec_fun, void *ptr);
+
 class AppCtx;
 class Statistics;
 
@@ -1014,15 +1017,15 @@ PetscErrorCode AppCtx::allocPetscObjs()
     ierr = MatCreate(PETSC_COMM_WORLD, &Mat_Jac_fs);                                      CHKERRQ(ierr);
     ierr = MatSetSizes(Mat_Jac_fs, PETSC_DECIDE, PETSC_DECIDE, n_unknowns_fs, n_unknowns_fs);   CHKERRQ(ierr);
     ierr = MatSetFromOptions(Mat_Jac_fs);                                                 CHKERRQ(ierr);
-    ierr = MatSeqAIJSetPreallocation(Mat_Jac_fs, PETSC_DEFAULT, NULL);                          CHKERRQ(ierr);
+    ierr = MatSeqAIJSetPreallocation(Mat_Jac_fs, PETSC_DEFAULT, NULL);                    CHKERRQ(ierr);
     ierr = MatSetOption(Mat_Jac_fs,MAT_NEW_NONZERO_ALLOCATION_ERR,PETSC_FALSE);           CHKERRQ(ierr);
     ierr = SNESCreate(PETSC_COMM_WORLD, &snes_fs);                                        CHKERRQ(ierr);
-//    ierr = SNESSetFunction(snes_fs, Vec_res_fs, FormFunction_fs, this);                         CHKERRQ(ierr);
-//    ierr = SNESSetJacobian(snes_fs, Mat_Jac_fs, Mat_Jac_fs, FormJacobian_fs, this);                CHKERRQ(ierr);
+    ierr = SNESSetFunction(snes_fs, Vec_res_fs, FormFunction_fs, this);                   CHKERRQ(ierr);
+    ierr = SNESSetJacobian(snes_fs, Mat_Jac_fs, Mat_Jac_fs, FormJacobian_fs, this);       CHKERRQ(ierr);
     ierr = SNESSetConvergenceTest(snes_fs,CheckSnesConvergence,this,PETSC_NULL);          CHKERRQ(ierr);
-    ierr = SNESGetKSP(snes_fs,&ksp_fs);                                                  CHKERRQ(ierr);
-    ierr = KSPGetPC(ksp_fs,&pc_fs);                                                      CHKERRQ(ierr);
-    ierr = KSPSetOperators(ksp_fs,Mat_Jac_fs,Mat_Jac_fs,SAME_NONZERO_PATTERN);              CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes_fs,&ksp_fs);                                                   CHKERRQ(ierr);
+    ierr = KSPGetPC(ksp_fs,&pc_fs);                                                       CHKERRQ(ierr);
+    ierr = KSPSetOperators(ksp_fs,Mat_Jac_fs,Mat_Jac_fs,SAME_NONZERO_PATTERN);            CHKERRQ(ierr);
 
     ierr = SNESSetFromOptions(snes_fs); CHKERRQ(ierr);
 //  }
@@ -1570,7 +1573,7 @@ PetscErrorCode AppCtx::setInitialConditions()
   VecCopy(Vec_uzp_0,Vec_uzp_1);
 
   // remember: Vec_normals follows the Vec_x_1
-
+//TODO: Quitar restos del problema fluidos, aquí comienzo a quitarlos con el if (false)
   //moveMesh(Vec_x_0, Vec_up_0, Vec_up_1, 1.0, tt, Vec_x_1);
   if (false) calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.0, Vec_v_mid, 0.0);  // Vec_up_0 = Vec_up_1, vtheta = 1.0, mean b.c. = Vec_up_1 = Vec_v_mid init. guess SNESSolve
   calcMeshVelocity(Vec_x_0, Vec_uzp_0, Vec_uzp_1, 1.0, Vec_v_mid, 0.0);  // Vec_up_0 = Vec_up_1, vtheta = 1.0, mean b.c. = Vec_up_1 = Vec_v_mid init. guess SNESSolve
@@ -1767,12 +1770,17 @@ PetscErrorCode AppCtx::setUPInitialGuess()
 {
   // set u^n+1 b.c.
 
-  VectorXi    u_dofs(dim);
+  VectorXi    u_dofs(dim);  //borrar!
+  VectorXi    u_dofs_fs(dim);
   VectorXi    x_dofs(dim);
   int tag;
 
   Vector      X1(dim);
   Vector      U1(dim);
+
+  //std::vector<bool>   SV(N_Solids,false);   //solid visited history
+  //VectorXi    node_dofs_fluid_fs(dim);
+  //VectorXi    node_dofs_solid_fs(3);
 
   point_iterator point = mesh->pointBegin();
   point_iterator point_end = mesh->pointEnd();
@@ -1781,25 +1789,29 @@ PetscErrorCode AppCtx::setUPInitialGuess()
     tag = point->getTag();
 
     getNodeDofs(&*point, DH_MESH, VAR_M, x_dofs.data());
-    getNodeDofs(&*point, DH_UNKS, VAR_U, u_dofs.data());
+    getNodeDofs(&*point, DH_UNKS, VAR_U, u_dofs.data());  //borrar!
+    getNodeDofs(&*point, DH_UNKM, VAR_U, u_dofs_fs.data());  //velocity only points, otherwise u_dofs = [-1,-1]
 
     VecGetValues(Vec_x_1, dim, x_dofs.data(), X1.data());
 
     if (  is_in(tag, dirichlet_tags)  )
     {
       U1 = u_exact(X1, current_time+dt, tag);
-      VecSetValues(Vec_up_1, dim, u_dofs.data(), U1.data(), INSERT_VALUES);
+      VecSetValues(Vec_up_1, dim, u_dofs.data(), U1.data(), INSERT_VALUES);  //borrar!
+      VecSetValues(Vec_uzp_1, dim, u_dofs_fs.data(), U1.data(), INSERT_VALUES);
     }
     else
     if (is_in(tag, solid_tags) || is_in(tag, feature_tags) || is_in(tag, triple_tags))
     {
       U1.setZero();
-      VecSetValues(Vec_up_1, dim, u_dofs.data(), U1.data(), INSERT_VALUES);
+      VecSetValues(Vec_up_1, dim, u_dofs.data(), U1.data(), INSERT_VALUES);  //borrar!
+      VecSetValues(Vec_uzp_1, dim, u_dofs_fs.data(), U1.data(), INSERT_VALUES);
     }
 
   } // end for point
 
   Assembly(Vec_up_1);
+  Assembly(Vec_uzp_1);
 
   PetscFunctionReturn(0);
 }
@@ -2775,7 +2787,7 @@ Vector AppCtx::getAreaMassCenterSolid(int sol_id){
   for (int i = 0; i < NS; i++){
     A = A + XPO[i](0)*XPO[i+1](1) - XPO[i+1](0)*XPO[i](1);
   }
-  A = 0.5*A;
+  A = 0.5*A;  //cout << A << endl;
   //mass center
   Vector CM(dim);
   CM = Vector::Zero(2);
@@ -3283,7 +3295,9 @@ int GetDataCellTag::get_data_i(int cellid) const
 /* petsc functions*/
 extern PetscErrorCode FormJacobian(SNES,Vec,Mat*,Mat*,MatStructure*,void*);
 extern PetscErrorCode FormFunction(SNES,Vec,Vec,void*);
-extern PetscErrorCode Monitor(SNES,PetscInt,PetscReal,void *);
+//extern PetscErrorCode Monitor(SNES,PetscInt,PetscReal,void *);
+extern PetscErrorCode FormJacobian(SNES,Vec,Mat*,Mat*,MatStructure*,void*);
+extern PetscErrorCode FormFunction(SNES,Vec,Vec,void*);
 
 
 #undef __FUNCT__
@@ -3374,7 +3388,7 @@ int main(int argc, char **argv)
   return 0.;
 }
 
-
+/* ------------------------------------------------------------------- */
 #undef __FUNCT__
 #define __FUNCT__ "FormJacobian"
 PetscErrorCode FormJacobian(SNES snes,Vec Vec_up_1,Mat *Mat_Jac, Mat *prejac, MatStructure *flag, void *ptr)
@@ -3383,8 +3397,6 @@ PetscErrorCode FormJacobian(SNES snes,Vec Vec_up_1,Mat *Mat_Jac, Mat *prejac, Ma
   user->formJacobian(snes,Vec_up_1,Mat_Jac,prejac,flag);
   PetscFunctionReturn(0);
 }
-
-/* ------------------------------------------------------------------- */
 #undef __FUNCT__
 #define __FUNCT__ "FormFunction"
 PetscErrorCode FormFunction(SNES snes, Vec Vec_up_1, Vec Vec_fun, void *ptr)
@@ -3393,7 +3405,7 @@ PetscErrorCode FormFunction(SNES snes, Vec Vec_up_1, Vec Vec_fun, void *ptr)
   user->formFunction(snes,Vec_up_1,Vec_fun);
   PetscFunctionReturn(0);
 }
-
+/* ------------------------------------------------------------------- */
 #undef __FUNCT__
 #define __FUNCT__ "CheckSnesConvergence"
 PetscErrorCode CheckSnesConvergence(SNES snes, PetscInt it,PetscReal xnorm, PetscReal pnorm, PetscReal fnorm, SNESConvergedReason *reason, void *ctx)
@@ -3402,9 +3414,7 @@ PetscErrorCode CheckSnesConvergence(SNES snes, PetscInt it,PetscReal xnorm, Pets
   user->checkSnesConvergence(snes, it, xnorm, pnorm, fnorm, reason);
   PetscFunctionReturn(0);
 }
-
-
-
+/* ------------------------------------------------------------------- */
 #undef __FUNCT__
 #define __FUNCT__ "FormJacobian_mesh"
 PetscErrorCode FormJacobian_mesh(SNES snes,Vec Vec_up_1,Mat *Mat_Jac, Mat *prejac, MatStructure *flag, void *ptr)
@@ -3413,13 +3423,28 @@ PetscErrorCode FormJacobian_mesh(SNES snes,Vec Vec_up_1,Mat *Mat_Jac, Mat *preja
   user->formJacobian_mesh(snes,Vec_up_1,Mat_Jac,prejac,flag);
   PetscFunctionReturn(0);
 }
-
-/* ------------------------------------------------------------------- */
 #undef __FUNCT__
 #define __FUNCT__ "FormFunction_mesh"
 PetscErrorCode FormFunction_mesh(SNES snes, Vec Vec_up_1, Vec Vec_fun, void *ptr)
 {
   AppCtx *user    = static_cast<AppCtx*>(ptr);
   user->formFunction_mesh(snes,Vec_up_1,Vec_fun);
+  PetscFunctionReturn(0);
+}
+/* ------------------------------------------------------------------- */
+#undef __FUNCT__
+#define __FUNCT__ "FormJacobian_fs"
+PetscErrorCode FormJacobian_fs(SNES snes,Vec Vec_up_1,Mat *Mat_Jac, Mat *prejac, MatStructure *flag, void *ptr)
+{
+  AppCtx *user    = static_cast<AppCtx*>(ptr);
+  user->formJacobian_fs(snes,Vec_up_1,Mat_Jac,prejac,flag);
+  PetscFunctionReturn(0);
+}
+#undef __FUNCT__
+#define __FUNCT__ "FormFunction"
+PetscErrorCode FormFunction_fs(SNES snes, Vec Vec_up_1, Vec Vec_fun, void *ptr)
+{
+  AppCtx *user    = static_cast<AppCtx*>(ptr);
+  user->formFunction_fs(snes,Vec_up_1,Vec_fun);
   PetscFunctionReturn(0);
 }

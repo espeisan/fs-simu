@@ -361,6 +361,9 @@ public:
   PetscErrorCode solveTimeProblem();
   PetscErrorCode formJacobian(SNES /*snes*/,Vec x,Mat *Mat_Jac, Mat* /*prejac*/, MatStructure * /*flag*/);
   PetscErrorCode formFunction(SNES /*snes*/, Vec x, Vec f);
+
+  PetscErrorCode formJacobian_fs(SNES /*snes*/,Vec x,Mat *Mat_Jac, Mat* /*prejac*/, MatStructure * /*flag*/);
+  PetscErrorCode formFunction_fs(SNES /*snes*/, Vec x, Vec f);
   
   PetscErrorCode meshAdapt();
   

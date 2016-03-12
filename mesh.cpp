@@ -1196,6 +1196,8 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
     Vector2d    tmp_n;
     Vector      k1(dim),k2(dim),k3(dim),k4(dim); //  RK4
 
+    std::vector<bool>   SV(N_Solids,false);  //solid visited history
+
     point_iterator point = mesh->pointBegin();
     point_iterator point_end = mesh->pointEnd();
     for (; point != point_end; ++point)  //to calculate Vec_v_mid at each point
@@ -1203,15 +1205,17 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
       tag = point->getTag();
 
       getNodeDofs(&*point, DH_MESH, VAR_M, node_dofs_mesh.data());
-      getNodeDofs(&*point, DH_UNKS, VAR_U, node_dofs_fluid.data());
+      getNodeDofs(&*point, DH_UNKS, VAR_U, node_dofs_fluid.data());  //borrar!
 
       if (!fluidonly_tags.empty() && (dim == 2)){
         nod_id = is_in_id(tag,flusoli_tags);
         if (nod_id){
+          if (!SV[nod_id-1]){
           //getNodeDofs(&*point, DH_UNKM, VAR_Z, node_dofs_solid_fs.data());
-          for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
-            node_dofs_solid_fs(l) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
+            for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
+              node_dofs_solid_fs(l) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
           			                         + 3*nod_id - 2 + l;
+            }
           }
         }
         else{
@@ -1219,7 +1223,7 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
         }
       }
 
-      VecGetValues(Vec_x_0, dim, node_dofs_mesh.data(), X0.data());
+      VecGetValues(Vec_x_0, dim, node_dofs_mesh.data(), X0.data());  //node mesh vel value
 
       if (force_mesh_velocity)
       {
@@ -1284,13 +1288,17 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
 //          VecSetValues(Vec_v_mid, dim, node_dofs_mesh.data(), tmp.data(), INSERT_VALUES);
           if (!fluidonly_tags.empty() && (dim == 2)){
             if (nod_id){
-              VecGetValues(Vec_up_0,  3, node_dofs_solid_fs.data(), U0_fs.data());
-              VecGetValues(Vec_up_1,  3, node_dofs_solid_fs.data(), U1_fs.data());
-              tmp_fs = vtheta*U1_fs + (1.-vtheta)*U0_fs;
-              point->getCoord(Xp.data(),dim);  //coords node1 of current edge
-              Xg = getAreaMassCenterSolid(nod_id);
-              tmp_n = SolidVel(Xp,Xg,tmp_fs);
-              VecSetValues(Vec_v_mid, dim, node_dofs_mesh.data(), tmp_n.data(), INSERT_VALUES);
+              if(!SV[nod_id-1]){
+                VecGetValues(Vec_up_0,  3, node_dofs_solid_fs.data(), U0_fs.data());
+                VecGetValues(Vec_up_1,  3, node_dofs_solid_fs.data(), U1_fs.data());
+                tmp_fs = vtheta*U1_fs + (1.-vtheta)*U0_fs;
+                point->getCoord(Xp.data(),dim);  //coords node1 of current edge
+                Xg = getAreaMassCenterSolid(nod_id);
+                tmp_n = SolidVel(Xp,Xg,tmp_fs);
+                VecSetValues(Vec_v_mid, dim, node_dofs_mesh.data(), tmp_n.data(), INSERT_VALUES);
+                SV[nod_id-1] = true;
+               // cout << "      " << nod_id << "   " << SV[0] << endl;
+              }
             }
             else{
               VecGetValues(Vec_up_0,  dim, node_dofs_fluid.data(), U0.data());
