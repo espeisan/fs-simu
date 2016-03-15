@@ -157,15 +157,15 @@ void AppCtx::loadDofs()
   n_dofs_v_per_facet  = dof_handler[DH_UNKS].getVariable(VAR_M).numDofsPerFacet();
   n_dofs_v_per_corner = dof_handler[DH_UNKS].getVariable(VAR_M).numDofsPerCorner();
 
-  n_dofs_f_per_cell   = dof_handler[DH_UNKM].getVariable(VAR_U).numDofsPerCell();
-  n_dofs_f_per_facet  = dof_handler[DH_UNKM].getVariable(VAR_U).numDofsPerFacet();
-  n_dofs_f_per_corner = dof_handler[DH_UNKM].getVariable(VAR_U).numDofsPerCorner();
+  n_dofs_f_per_cell   = dof_handler[DH_UNKM].getVariable(VAR_U).numDofsPerCell();  //borrar!
+  n_dofs_f_per_facet  = dof_handler[DH_UNKM].getVariable(VAR_U).numDofsPerFacet();  //borrar!
+  n_dofs_f_per_corner = dof_handler[DH_UNKM].getVariable(VAR_U).numDofsPerCorner();  //borrar!
   n_dofs_z_per_cell   = dof_handler[DH_UNKM].getVariable(VAR_Z).numDofsPerCell();
   n_dofs_z_per_facet  = dof_handler[DH_UNKM].getVariable(VAR_Z).numDofsPerFacet();
   n_dofs_z_per_corner = dof_handler[DH_UNKM].getVariable(VAR_Z).numDofsPerCorner();
-  n_dofs_q_per_cell   = dof_handler[DH_UNKM].getVariable(VAR_Q).numDofsPerCell();
-  n_dofs_q_per_facet  = dof_handler[DH_UNKM].getVariable(VAR_Q).numDofsPerFacet();
-  n_dofs_q_per_corner = dof_handler[DH_UNKM].getVariable(VAR_Q).numDofsPerCorner();
+  n_dofs_q_per_cell   = dof_handler[DH_UNKM].getVariable(VAR_Q).numDofsPerCell();  //borrar!
+  n_dofs_q_per_facet  = dof_handler[DH_UNKM].getVariable(VAR_Q).numDofsPerFacet();  //borrar!
+  n_dofs_q_per_corner = dof_handler[DH_UNKM].getVariable(VAR_Q).numDofsPerCorner();  //borrar!
 }
 
 void AppCtx::setUpDefaultOptions()
@@ -1105,6 +1105,7 @@ void AppCtx::matrixColoring()
   MatrixXd Z5fsloc = MatrixXd::Zero(n_dofs_p_per_cell,9);
 
 if (!fluidonly_tags.empty() && (dim == 2)){
+  std::vector<bool>   SV(N_Solids,false);  //solid visited history
   cell = mesh->cellBegin();
 //  cell_iterator cell_end = mesh->cellEnd();
   for (; cell != cell_end; ++cell)
@@ -1125,10 +1126,13 @@ if (!fluidonly_tags.empty() && (dim == 2)){
       tag = mesh->getNodePtr(cell->getNodeId(j))->getTag();
       nod_id = is_in_id(tag,flusoli_tags);
       if (nod_id){
-        for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
-          mapZ_c(j*cell->numNodes() + l) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
+        //if(!SV[nod_id-1]){
+          for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
+            mapZ_c(j*cell->numNodes() + l) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
         			                         + 3*nod_id - 2 + l;
-        }
+          }
+          //SV[nod_id-1] = true;  //cout << "Solid " << nod_id << " visited." << endl;
+        //}
       }
     }
     //cout << endl << mapF_c << "\n" << mapZ_c << endl;
@@ -1526,7 +1530,7 @@ PetscErrorCode AppCtx::setInitialConditions()
 
   } // end compute mesh sizes
 
-
+  std::vector<bool>   SV(N_Solids,false);  //solid visited history
 
   // velocidade inicial e pressao inicial, guardados em Vec_up_0
   point_iterator point = mesh->pointBegin();
@@ -1552,10 +1556,13 @@ PetscErrorCode AppCtx::setInitialConditions()
 
     nod_id = is_in_id(tag,flusoli_tags);
     if (nod_id){
-      getNodeDofs(&*point,DH_UNKM,VAR_Z,dofs_fs.data());
-      for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
-        dofs_fs(l) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
-      			                         + 3*nod_id - 2 + l;
+      if (!SV[nod_id-1]){
+        //getNodeDofs(&*point,DH_UNKM,VAR_Z,dofs_fs.data());
+        for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
+          dofs_fs(l) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
+      		    	                         + 3*nod_id - 2 + l;
+        }
+        SV[nod_id-1] = true;
       }
       VecSetValues(Vec_uzp_0, 3, dofs_fs.data(), Zf.data(), INSERT_VALUES);  //cout << endl << dofs_fs << endl;
     }
@@ -1568,7 +1575,7 @@ PetscErrorCode AppCtx::setInitialConditions()
 
 //PetscInt size1;
   Assembly(Vec_up_0);  //VecView(Vec_up_0,PETSC_VIEWER_STDOUT_WORLD);  //vel_unk + pres_unk //VecGetSize(Vec_up_0,&size1);
-  VecCopy(Vec_up_0,Vec_up_1);
+  VecCopy(Vec_up_0,Vec_up_1);  //borrar!
   Assembly(Vec_uzp_0);  //VecView(Vec_uzp_0,PETSC_VIEWER_STDOUT_WORLD);  //u_unk+z_unk+p_unk //VecGetSize(Vec_up_0,&size1);
   VecCopy(Vec_uzp_0,Vec_uzp_1);
 
@@ -1603,7 +1610,8 @@ PetscErrorCode AppCtx::setInitialConditions()
         if (solve_the_sys)
         {
           //setUPInitialGuess();
-          ierr = SNESSolve(snes,PETSC_NULL,Vec_up_1);  CHKERRQ(ierr);
+          if (false) {ierr = SNESSolve(snes,PETSC_NULL,Vec_up_1);  CHKERRQ(ierr);}
+          ierr = SNESSolve(snes_fs,PETSC_NULL,Vec_uzp_1);  CHKERRQ(ierr);
         }
         // * SOLVE THE SYSTEM *
 //cout << "new iter" << endl;
@@ -1810,7 +1818,7 @@ PetscErrorCode AppCtx::setUPInitialGuess()
 
   } // end for point
 
-  Assembly(Vec_up_1);
+  Assembly(Vec_up_1);  //borrar!
   Assembly(Vec_uzp_1);
 
   PetscFunctionReturn(0);
@@ -2675,7 +2683,7 @@ void AppCtx::pressureTimeCorrection(Vec &Vec_up_0, Vec &Vec_up_1, double a, doub
   Tensor    R(dim,dim);
   int       dof;
   //int       dof;
-  int tag;
+  //int tag;
   double P0, P1, P2;
 
   if (behaviors & BH_Press_grad_elim)
@@ -3352,7 +3360,7 @@ int main(int argc, char **argv)
     cout << "\n# velocity solid int unknowns: " << user.flusoli_tags.size()*3 << " (" <<
     		                                       user.dof_handler[DH_UNKM].getVariable(VAR_Z).numPositiveDofs()/3 << ")";
     cout << "\n# pressure unknowns: " << user.dof_handler[DH_UNKM].getVariable(VAR_Q).numPositiveDofs();
-    cout << "\n# total unknowns: " << user.n_unknowns_fs << endl;
+    cout << "\n# total unknowns: " << user.n_unknowns_fs; cout << "\n# solids: " << user.N_Solids << endl;
     cout << "unknowns distribution: " << 0 << "-" << user.dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs()-1 <<
     		", " << user.dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() << "-" <<
 			user.dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() + user.flusoli_tags.size()*3 - 1<<

@@ -591,15 +591,15 @@ public:
   int           n_dofs_v_per_corner;
   //int           n_dofs_v2_per_facet;
   int           n_unknowns_fs;
-  int           n_dofs_f_per_cell;
-  int           n_dofs_f_per_facet;
-  int           n_dofs_f_per_corner;
-  int           n_dofs_z_per_cell;
-  int           n_dofs_z_per_facet;
-  int           n_dofs_z_per_corner;
-  int           n_dofs_q_per_cell;
-  int           n_dofs_q_per_facet;
-  int           n_dofs_q_per_corner;
+  int           n_dofs_f_per_cell;  //borrar!
+  int           n_dofs_f_per_facet;  //borrar!
+  int           n_dofs_f_per_corner;  //borrar!
+  int           n_dofs_z_per_cell;  //borrar!
+  int           n_dofs_z_per_facet;  //borrar!
+  int           n_dofs_z_per_corner;  //borrar!
+  int           n_dofs_q_per_cell;  //borrar!
+  int           n_dofs_q_per_facet;  //borrar!
+  int           n_dofs_q_per_corner;  //borrar!
   
   int           N_Solids;
   std::vector<int>   NN_Solids;

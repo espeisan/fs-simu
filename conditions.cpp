@@ -272,7 +272,7 @@ Tensor grad_u_exact(Vector const& X, double t, int tag)
 Vector z_exact(Vector const& X, double t, int tag)
 {
   Vector v(Vector::Zero(3));
-  //v << 3.14, 722, 3.1416;
+  v << 3.14, 722, 3.1416;
   return v;
 }
 
