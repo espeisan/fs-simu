@@ -1296,7 +1296,7 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
                 Xg = getAreaMassCenterSolid(nod_id);
                 tmp_n = SolidVel(Xp,Xg,tmp_fs);
                 VecSetValues(Vec_v_mid, dim, node_dofs_mesh.data(), tmp_n.data(), INSERT_VALUES);
-                SV[nod_id-1] = true;
+                SV[nod_id-1] = true;  XG[nod_id-1] = Xg;
                // cout << "      " << nod_id << "   " << SV[0] << endl;
               }
             }

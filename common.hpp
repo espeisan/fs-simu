@@ -120,6 +120,12 @@ Vector solid_veloc(Vector const& X, double t, int tag);
 Tensor feature_proj(Vector const& X, double t, int tag);
 
 
+inline double sum_vec(std::vector<int> V){
+  int sum = 0;
+  for (unsigned int i = 0; i < V.size(); i++) {sum = sum + V[i];}
+  return sum;
+}
+
 inline double sqr(double v) {return v*v;}
 
 void inline inverseAndDet(Tensor const& a, int dim, Tensor& inv, double& det)
@@ -261,6 +267,12 @@ inline bool lessVector(Vector2d const& a, Vector2d const& b){
 }
 inline double cross2d(Vector2d const& o, Vector2d const& a, Vector2d const& b){
   return (a(0)-o(0))*(b(1)-o(1)) - (a(1)-o(1))*(b(0)-o(0));
+}
+
+inline double DobCont(Tensor const& A, Tensor const& B){
+  double d = 0;
+  for (int i = 0; i < A.rows(); i++) {d += A.row(i).dot(B.row(i));}
+  return d;
 }
 
 
@@ -601,8 +613,10 @@ public:
   int           n_dofs_q_per_facet;  //borrar!
   int           n_dofs_q_per_corner;  //borrar!
   
-  int           N_Solids;
-  std::vector<int>   NN_Solids;
+  int                    N_Solids;
+  std::vector<int>       NN_Solids;
+  std::vector<Vector2d>  XG;
+
   // mesh alias
   int           n_nodes;
   int           n_cells;

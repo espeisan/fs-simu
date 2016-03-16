@@ -370,7 +370,7 @@ bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
 	flusoli_tags.resize(nmax);
   else
 	flusoli_tags.clear();
-  N_Solids = flusoli_tags.size();
+  N_Solids = flusoli_tags.size();  if (N_Solids) XG.resize(N_Solids);
 
   fluidonly_tags.resize(16);  //cout << flusol_tags.max_size() << endl;
   nmax = fluidonly_tags.size();
@@ -1098,11 +1098,11 @@ void AppCtx::matrixColoring()
   MatrixXd Gfsloc = MatrixXd::Zero(n_dofs_u_per_cell, n_dofs_p_per_cell);
   MatrixXd Efsloc = MatrixXd::Zero(n_dofs_p_per_cell, n_dofs_p_per_cell);
 
-  MatrixXd Z1fsloc = MatrixXd::Zero(n_dofs_u_per_cell,9);
-  MatrixXd Z2fsloc = MatrixXd::Zero(9,n_dofs_u_per_cell);
-  MatrixXd Z3fsloc = MatrixXd::Zero(9,9);
-  MatrixXd Z4fsloc = MatrixXd::Zero(9,n_dofs_p_per_cell);
-  MatrixXd Z5fsloc = MatrixXd::Zero(n_dofs_p_per_cell,9);
+  MatrixXd Z1fsloc = MatrixXd::Zero(n_dofs_u_per_cell,nodes_per_cell*3);
+  MatrixXd Z2fsloc = MatrixXd::Zero(nodes_per_cell*3,n_dofs_u_per_cell);
+  MatrixXd Z3fsloc = MatrixXd::Zero(nodes_per_cell*3,nodes_per_cell*3);
+  MatrixXd Z4fsloc = MatrixXd::Zero(nodes_per_cell*3,n_dofs_p_per_cell);
+  MatrixXd Z5fsloc = MatrixXd::Zero(n_dofs_p_per_cell,nodes_per_cell*3);
 
 if (!fluidonly_tags.empty() && (dim == 2)){
   std::vector<bool>   SV(N_Solids,false);  //solid visited history

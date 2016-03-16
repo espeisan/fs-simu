@@ -2036,9 +2036,10 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
   {
     VectorXd          FUloc(n_dofs_u_per_cell);  // U subvector part of F
     VectorXd          FPloc(n_dofs_p_per_cell);
+    VectorXd          FZloc(nodes_per_cell*3);
 
     /* local data */
-    int                 tag, nod_id, fac_id;
+    int                 tag, nod_id;
     MatrixXd            u_coefs_c_mid_trans(dim, n_dofs_u_per_cell/dim);  // n+utheta  // trans = transpost
     MatrixXd            u_coefs_c_old(n_dofs_u_per_cell/dim, dim);        // n
     MatrixXd            u_coefs_c_old_trans(dim,n_dofs_u_per_cell/dim);   // n
@@ -2150,11 +2151,11 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     Vector              FUb(dim);                                     // BC
     Vector              FPx(dim); // pressure gradient
 
-    MatrixXd            Z1fsloc(n_dofs_u_per_cell,9);
-    MatrixXd            Z2fsloc(9,n_dofs_u_per_cell);
-    MatrixXd            Z3fsloc(9,9);
-    MatrixXd            Z4fsloc(9,n_dofs_p_per_cell);
-    MatrixXd            Z5fsloc(n_dofs_p_per_cell,9);
+    MatrixXd            Z1fsloc(n_dofs_u_per_cell,nodes_per_cell*3);
+    MatrixXd            Z2fsloc(nodes_per_cell*3,n_dofs_u_per_cell);
+    MatrixXd            Z3fsloc(nodes_per_cell*3,nodes_per_cell*3);
+    MatrixXd            Z4fsloc(nodes_per_cell*3,n_dofs_p_per_cell);
+    MatrixXd            Z5fsloc(n_dofs_p_per_cell,nodes_per_cell*3);
 
     Vector              force_at_mid(dim);
     Vector              Res(dim);                                     // residue
@@ -2183,6 +2184,14 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     p_id_cor = 3*(n_solid_nodes-N_Solids)*p_id_cor;
 
     std::vector<bool>   SV(N_Solids,false);  //solid visited history
+    std::vector<int>    SV_c(nodes_per_cell,0);   //maximum nodes in solid visited saving the solid tag
+
+    Vector Rotf(dim), Rotv(dim);
+    Vector Zw(3); Zw << 0,0,1;
+    Vector Xg(dim);
+    Vector2d XIp;
+    Vector auxRotf(dim), auxRotv(dim);
+    Tensor auxTenf(dim,dim), auxTenv(dim,dim);
 
     const int tid = omp_get_thread_num();
     const int nthreads = omp_get_num_threads();
@@ -2218,8 +2227,10 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
             //SV[nod_id-1] = true;  //cout << "Solid " << nod_id << " visited." << endl;
           //}
         }
+        SV_c[j]=(nod_id);
       }
-      //cout << endl << mapZ_c << endl << endl; //VecSetOption(Vec_uzp_0, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
+      for (int j = 0; j < nodes_per_cell; j++) {cout << SV_c[j] << " ";} cout << endl;
+      cout << mapZ_c.transpose() << endl; //VecSetOption(Vec_uzp_0, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
       if ((is_bdf2 && time_step > 0) || (is_bdf3 && time_step > 1))
         VecGetValues(Vec_v_1, mapM_c.size(), mapM_c.data(), v_coefs_c_mid.data());
       else
@@ -2265,6 +2276,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       Gloc.setZero();
       Dloc.setZero();
       FUloc.setZero();
+      FZloc.setZero();
       FPloc.setZero();
       Eloc.setZero();
       double ddt_factor;
@@ -2470,12 +2482,58 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
           FPloc(i) -= JxW_mid* dxU.trace()*psi_c[qp][i];
           //FPloc(i) -= JxW_new* dxU_new.trace() *psi_c[qp][i];
 
-        for (int j = 0; j < cell->numFacets(); ++j){
-          tag = mesh->getFacetPtr(cell->getFacetId(j))->getTag();
-          fac_id = is_in_id(tag,flusoli_tags);
+        //for (int j = 0; j < cell->numFacets(); ++j){
+         // tag = mesh->getFacetPtr(cell->getFacetId(j))->getTag();
+          //fac_id = is_in_id(tag,flusoli_tags);
+        //}
 
+        if (sum_vec(SV_c)){
+          for (int I = 0; I < nodes_per_cell; I++){
+            int K = SV_c[I];
+            if (K != 0){
+              for (int C = 0; C < 3; C++){
+                if (C < 2){
+                  FZloc(I*3 + C) += JxW_mid*
+                      ( rho*(unsteady*dUdt(C) + has_convec*Uconv_qp.dot(dxU.row(C)))*phi_c[qp][I] + // aceleração
+                        visc*dxphi_c.row(I).dot(dxU.row(C) + dxU.col(C).transpose()) - //rigidez  //transpose() here is to add 2 row-vectors
+                        force_at_mid(C)*phi_c[qp][I] -// força
+                        Pqp_new*dxphi_c(I,C) );
+                }
+                else{
+                  Xg = XG[K-1];
+                  mesh->getNodePtr(cell->getNodeId(I))->getCoord(XIp.data(),dim);
+                  Rotf = SolidVel(XIp,Xg,Zw);  //fixed evaluation point Ip
+                  Rotv = SolidVel(Xqp,Xg,Zw);  //variable evaluation point qp
+                  //cout << XIp.transpose() << "   " << Xqp.transpose() << "   " << Xg.transpose()
+                  //     << "   " << Rotf.transpose() << "   " << Rotv.transpose() << endl;
+                  auxRotf << dxU.col(0).dot(Rotf),dxU.col(1).dot(Rotf);
+                  auxRotv << dxU.col(0).dot(Rotv),dxU.col(1).dot(Rotv);
+                  auxTenf << auxRotf(0)*dxphi_c(I,0),auxRotf(0)*dxphi_c(I,1),
+                             auxRotf(1)*dxphi_c(I,0),auxRotf(1)*dxphi_c(I,1);
+                  auxTenv << auxRotf(0)*dxphi_c(I,0),auxRotf(0)*dxphi_c(I,1)-phi_c[qp][I],
+                             auxRotf(1)*dxphi_c(I,0)+phi_c[qp][I],auxRotf(1)*dxphi_c(I,1);
+
+                  FZloc(I*3 + C) += JxW_mid*(
+                      rho*(unsteady*dUdt.dot(auxRotv) + has_convec*Uconv_qp.dot(auxRotv))*phi_c[qp][I] +
+                      visc*(DobCont(dxU,auxTenv)+DobCont(dxU.transpose(),auxTenv)) -
+                      force_at_mid.dot(auxRotv)*phi_c[qp][I] -
+                      Pqp_new*auxTenv.trace()
+                      //rho*(unsteady*dUdt.dot(auxRotf) + has_convec*Uconv_qp.dot(auxRotf))*phi_c[qp][I] +
+                      //visc*(DobCont(dxU,auxTenf)+DobCont(dxU.transpose(),aunxTenf)) -
+                      //force_at_mid.dot(auxRotf)*phi_c[qp][I] -
+                      //Pqp_new*auxTenf.trace()
+                          );
+
+/*
+                      ( rho*(unsteady*dUdt(C) + has_convec*Uconv_qp.dot(dxU.row(C)))*phi_c[qp][I] + // aceleração
+                        visc*dxphi_c.row(I).dot(dxU.row(C) + dxU.col(C).transpose()) - //rigidez  //transpose() here is to add 2 row-vectors
+                        force_at_mid(C)*phi_c[qp][I] -// força
+                        Pqp_new*dxphi_c(I,C) );
+*/                }
+              }
+            }
+          }
         }
-
 #if(false)
         // ----------------
         //
