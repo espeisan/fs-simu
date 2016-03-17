@@ -2850,6 +2850,36 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
 
   }  //end LOOP NAS CÉLULAS parallel
 
+  //LOOP FOR SOLID-ONLY CONTRIBUTION
+  {
+    VectorXd   FZsloc(3);
+    VectorXi   mapZ_s(3);
+    MatrixXd   z_coefs_old(3);
+    MatrixXd   z_coefs_new(3);
+    Vector     dZdt(3);
+    Vector     Grav;
+
+
+    for (int K = 0; K < N_Solids; K++){
+      Grav = gravity();
+      for (int C = 0; C < 3; C++){
+        mapZ_s(C) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
+                                                     + 3*(K+1) - 2 + C;
+      }
+      VecGetValues(Vec_uzp_0,    mapZ_s.size(), mapZ_s.data(), z_coefs_old.data());
+      VecGetValues(Vec_uzp_k ,   mapZ_s.size(), mapZ_s.data(), z_coefs_new.data());
+      dZdt = (z_coefs_new - z_coefs_old)/dt;
+      for (int C = 0; C < 3; C++){
+        if (C < 2){
+          FZsloc(C) = MV[K]*dZdt(C) - MV[K]*Grav(C);
+        }
+        else{
+          FZsloc(C) = MV[K]*dZdt(C);  // + intertia tensor component instead of dZdt
+        }
+      }
+    }
+  }
+
   // LOOP NAS FACES DO CONTORNO (Neumann)
   //~ FEP_PRAGMA_OMP(parallel default(none) shared(Vec_uzp_k,Vec_fun_fs,cout))
   {

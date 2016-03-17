@@ -25,6 +25,7 @@ double p_initial(Vector const& X, int tag);
 Vector z_initial(Vector const& X, int tag);
 Vector solid_normal(Vector const& X, double t, int tag);
 Tensor feature_proj(Vector const& X, double t, int tag);
+Vector gravity();
 
 
 // gota estática 2d/////////////////////////////////////////////////////////////
@@ -249,6 +250,23 @@ Vector force(Vector const& X, double t, int tag)
   }
   return f;
 }
+
+Vector gravity(){
+  double x = X(0);
+  double y = X(1);
+
+  Vector f(Vector::Zero(X.size()));
+  //if (tag == 15)
+  //{
+    f(1) = -8e-4;  //*1e3;
+  //}
+  //else
+  //{
+  //  f(1) = 0.0;  //-8e-4*1e4;
+  //}
+  return f;
+}
+
 
 Vector u_exact(Vector const& X, double t, int tag)
 {

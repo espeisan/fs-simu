@@ -209,8 +209,8 @@ void AppCtx::setUpDefaultOptions()
 
 bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
 {
-  PetscBool          flg_fin, flg_fout;
-  char               finaux[PETSC_MAX_PATH_LEN];
+  PetscBool          flg_fin, flg_fout, flg_min;
+  char               finaux[PETSC_MAX_PATH_LEN], minaux[PETSC_MAX_PATH_LEN];
   char               foutaux[PETSC_MAX_PATH_LEN];
   PetscBool          ask_help;
 
@@ -257,7 +257,7 @@ bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
   PetscOptionsScalar("-beta2", "par vel elastica", "main.cpp", beta2, &beta2, PETSC_NULL);
   PetscOptionsScalar("-finaltime", "the simulation ends at this time.", "main.cpp", finaltime, &finaltime, PETSC_NULL);
   PetscOptionsBool("-ale", "mesh movement", "main.cpp", ale, &ale, PETSC_NULL);
-  PetscOptionsGetString(PETSC_NULL,"-fin",finaux,PETSC_MAX_PATH_LEN-1,&flg_fin);
+  PetscOptionsGetString(PETSC_NULL,"-fin",finaux,PETSC_MAX_PATH_LEN-1,&flg_fin); PetscOptionsGetString(PETSC_NULL,"-min",minaux,PETSC_MAX_PATH_LEN-1,&flg_min);
   PetscOptionsGetString(PETSC_NULL,"-fout",foutaux,PETSC_MAX_PATH_LEN-1,&flg_fout);
   PetscOptionsHasName(PETSC_NULL,"-help",&ask_help);
 
@@ -455,6 +455,21 @@ bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
   if (flg_fout)
     filename_out.assign(foutaux);
 
+  if (flg_min){
+    filemass.assign(minaux);
+    int N = N_Solids;
+    double mass;
+    ifstream is;
+    is.open(filemass.c_str(),ifstream::in);
+    if (!is.good()) {cout << "mass file not found" << endl;}
+    for (; N > 0; N--){
+      is >> mass; //cout << mass << endl;
+      MV.push_back(mass);
+    }
+    is.close();
+    MV.resize(N_Solids);
+  }
+
   //if (neumann_tags.size() + interface_tags.size() == 0 || force_pressure)
   if (force_pressure)
   {
@@ -470,7 +485,6 @@ bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
       printf("ale with steady problem?\n");
       //throw;
     }
-    //dt = 1.e50;
 
     if (utheta != 1)
     {

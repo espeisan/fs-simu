@@ -118,6 +118,7 @@ Vector solid_normal(Vector const& X, double t, int tag);
 Vector v_exact(Vector const& X, double t, int tag);
 Vector solid_veloc(Vector const& X, double t, int tag);
 Tensor feature_proj(Vector const& X, double t, int tag);
+Vector gravity();
 
 
 inline double sum_vec(std::vector<int> V){
@@ -498,7 +499,7 @@ public:
   int         quadr_degree_err;
   bool        pres_pres_block;
   float       grow_factor;
-  string      filename;
+  string      filename, filemass;
   string      filename_out;
 
   std::vector<int> dirichlet_tags;   // vetor com os tags que indicam contorno dirichlet
@@ -615,6 +616,7 @@ public:
   
   int                    N_Solids;
   std::vector<int>       NN_Solids;
+  std::vector<double>    MV;  //mass vector
   std::vector<Vector2d>  XG;
 
   // mesh alias
