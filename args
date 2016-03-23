@@ -1,78 +1,74 @@
-options_left
--dim 2      		        # cell dimension (= space dimension)
--dt 0.01                    # time step
--finaltime 100              # the simulation ends at this time.
--maxts -40                  # maximum number of time steps
--renumber_dofs 0            # dofs renumbering
--print_step 10             # print step
--has_convec 1               # convective term: true or false CONSIDERE COLOCAR utheta=1 se desativar isto.
--unsteady   1               # steady or unsteady problem
+-dim 2
+-dt 0.01
+-finaltime 10
+-maxts -40
+-renumber_dofs 0
+-print_step 10
+-has_convec 1
+-unsteady   1
 -boundary_smoothing 0
--force_mesh_velocity 0      # imposes the mesh velocity of boundary grid
--nonlinear_elasticity 1     # non-linear term in the elasticity problem
--mesh_adapt 1               # 1 to enable mesh adaption
--fprint_ca 0                # print contact angle at file ContactHistory
-beta1 0.0                   # Vmesh = bet1 * Ufluid  +  bet2 * Uelastic
+-force_mesh_velocity 0
+-nonlinear_elasticity 0
+-mesh_adapt 1
+-fprint_ca 0
+beta1 0.0
 beta2 1.0
--plot_es 1                  # plot exact solution: true or false
--family_files 1             # plot output as 001, 002, 003, ...
--sst -1.e-7                 # steady state tol (Unew-Uold)/(Unew)
--utheta 0.5                  # time discretization theta method (momentum)
--vtheta 0.5                  # time discretization theta method (mesh velocity)
--quadr_c 4                  # quadrature degree (cell) // 2D: 3 para ME e TH2, 2 para GLS .... 3D
--quadr_f 3                  # quadrature degree (facet)
--quadr_r 2                  # quadrature degree (corner)
--quadr_e 8                  # quadrature degree (exact)
--ale 1                      #
--force_pressure 0           # force pressure at a random point
+-plot_es 1
+-family_files 1
+-sst -1.e-7
+-utheta 0.5
+-vtheta 0.5
+-quadr_c 4
+-quadr_f 3
+-quadr_r 2
+-quadr_e 8
+-ale 1
+-force_pressure 0
+-print_to_matlab 1
 
-# Petsc options
--pc_type lu lu                      # Preconditioner (one of) none jacobi pbjacobi bjacobi sor lu shell mg eisenstat ilu icc cholesky asm ksp composite redundant nn mat fieldsplit galerkin exotic openmp asa cp bfbt lsc redistribute tfs (PCSetType)
-sub_pc_type ilu
-pc_factor_mat_solver_package mumps  # MUMPS
+-pc_type lu lu 
+pc_factor_mat_solver_package mumps
 mat_mumps_icntl_7 2
 pc_factor_levels 2
-sub_pc_factor_levels 1              # <0>  ativar quando o resolutor não estiver convergindo
-pc_composite_type multiplicative    # one of multiplicative, additive, special
+sub_pc_factor_levels 1
+pc_composite_type multiplicative
 pc_composite_pcs ilu,ilu
--ksp_type preonly   # (one of) preonly bcgs gmres cg cgne nash stcg gltr richardson chebychev tcqmr ibcgs bcgsl cgs tfqmr cr lsqr qcg bicg fgmres minres symmlq lgmres lcd broyden gcr (KSPSetType)
-ksp_initial_guess_nonzero 1         # não usar com precond asm+lu, alias nao usar nunca (talvez um erro da versão dev????)
+-ksp_type preonly
+ksp_initial_guess_nonzero 1
 ksp_gmres_restart 300
 -pc_factor_shift_type NONZERO
 -pc_factor_shift_amount 1.e-12
-pc_factor_mat_ordering_type natural # natural nd 1wd rcm qmd rowlength flow (PCFactorSetMatOrderingType)
+pc_factor_mat_ordering_type natural
 -pc_factor_reuse_ordering 1
 pc_factor_nonzeros_along_diagonal 1.e-10
 pc_factor_diagonal_fill
 
 pc_factor_fill 3.22746e-06
 pc_factor_in_place
--ksp_rtol 1e-11 #<1e-8>
+-ksp_rtol 1e-11
 
 log_trace stdout
 malloc_debug 1
 snes_fd 0
--snes_linesearch_type basic      # line search: basic, cubic, quadratic
-snes_type test ksponly           # Nonlinear solver method (one of) ls tr test picard ksponly vi ngmres sorqn
+-snes_linesearch_type basic
+snes_type test ksponly
 snes_picard_alpha 1.2
-snes_test_display 1              # compare f.e. jacobian with f.d. jacobian
-snes_monitor_cancel 0            # cancela monitoramento
+snes_test_display 1
+snes_monitor_cancel 0
 -snes_monitor stdout
 snes_converged_reason 1
--snes_stol 1.e-11                # <1e-08>: Stop if step length less than
--snes_rtol 1.e-11                # <1e-08>: Stop if decrease in function norm less than
+-snes_stol 1.e-11
+-snes_rtol 1.e-11
 snes_atol 1.e-12
 ksp_monitor stdout
 -snes_max_it 20
 mat_no_inode 1
 
-##### DEBUG
--print_to_matlab 0               # prints jacobian to matlab
--force_dirichlet 1               # forces dirichlet b.c.
-fp_trap 1                        # stop on floating-point exceptions
+-print_to_matlab 0
+-force_dirichlet 1
+fp_trap 1
 -on_error_abort 1
 
-###### THREADS #ativar os 3 primeiros somente ##################### 
 vec_type seqpthread
 mat_type seqaijpthread
 thread_sync_type LOCKFREE
@@ -81,81 +77,39 @@ mat_threads 3
 use_thread_pool main
 nthreads 3
 
-##################### Boundary conditions (dir; neu) #################################
-options: dir_tags, neum_tags, interf_tags, solid_tags, triple_tags  # (dir, neumman, interface)
+canal      dir_tags 2,1 neum_tags 3 feature_tags 3
+solid 2d     -dir_tags 13  -fsi_tags 14 -fonly_tags 15,13
+solid 2d 2b dir_tags 1-5,33 fsi_tags 5 fonly_tags 1-5,100,33
+solid 2d Nb dir_tags 1-6 fsi_tags 101-107 fonly_tags 1-7
 
-naive        dir_tags 9,10 feature_tags 12,6
-canal        dir_tags 2,3 feature_tags 1
-cilindro     dir_tags 2,4,3 feature_tags 6 
-cavidade     dir_tags 7,8 feature_tags 5,6
-falling      dir_tags 3,5,1 feature_tags 4,6 interf_tags 11 
-gota 2d      -dir_tags 13 -interf_tags 14
-gota 3d      dir_tags 101,102,103,104,105,106 interf_tags 100
-gota osc     dir_tags 200 interf_tags 100
-satic drop   interf_tags 2 neum_tags 2 (debug)
-bolhas       dir_tags 1,2,3,4 interf_tags 5
+-function_space 1
+function_space 2
+function_space 3
+function_space 4
+function_space 5
+function_space 6
+function_space 7
+function_space 8
+function_space 9
 
-############################################################################
+mesh_type 8
+mesh_type 16
+mesh_type 32
+mesh_type 64
+mesh_type 128
+mesh_type 256
+mesh_type 512
+mesh_type 1024
+mesh_type 2048
+mesh_type 4096
 
-function_space 1 # P1P1 (or Q1Q1) GLS stabilization
-function_space 2 # P1+P1 with bubble condensation
-function_space 3 # P2+Pm1 with bubble condensation and pressure gradient elimination
--function_space 4 # P2P1 (or Q2Q1)
-function_space 5 # P1+P1
-function_space 6 # P2P0
-function_space 7 # P2+Pm1 full
-function_space 8 # P1P1 unstable
-function_space 9 # P2+P1 with bubble condensation
-
-mesh_type 8      # TRIANGLE3        = 0x8,
-mesh_type 16     # TRIANGLE6        = 0x10,
-mesh_type 32     # QUADRANGLE4      = 0x20,
-mesh_type 64     # QUADRANGLE8      = 0x40,
-mesh_type 128    # QUADRANGLE9      = 0x80,
-mesh_type 256    # TETRAHEDRON4     = 0x100,
-mesh_type 512    # TETRAHEDRON10    = 0x200,
-mesh_type 1024   # HEXAHEDRON8      = 0x400,
-mesh_type 2048   # HEXAHEDRON20     = 0x800,
-mesh_type 4096   # HEXAHEDRON27     = 0x1000,
-
-########## Testes ##########
-
-fin results/naive/naive.msh
-fout results/naive/naive.vtk
-fin results/canal/canal.msh
+fin results/canal/canal_ord1.msh
 fout results/canal/canal.vtk
-fin results/cilindro/cilindro.msh
-fout results/cilindro/cilindro.vtk
-fin results/cilindro_mod/cilindro_mod.msh
-fout results/cilindro_mod/cilindro_mod.vtk
-fin results/cavidade/cavidade.msh
-fout results/cavidade/cavidade.vtk
-fin results/falling_water/fall.msh
-fout results/falling_water/fall.vtk
 
-fin results/gota_est/2d/gota_2.msh
-fout results/gota_est/2d/gota_2.vtk
-fin results/gota_est/3d/gota_micro.msh
-fout results/gota_est/3d/gota_micro.vtk
-fin results/gota_est/2d/gota_busc_ex.msh
-fout results/gota_est/2d/gota_busc_ex.vtk
+-fin results/sol_asc/2d/solid_micro.msh
+-fout results/sol_asc/2d/solid_micro_.vtk
+-min results/sol_asc/2d/solid_micro.txt
 
-fin results/gota_asc/2d/gota_micro.msh
-fout results/gota_asc/2d/gota_micro.vtk
-fin results/gota_asc/3d/gota_micro.msh
-fout results/gota_asc/3d/gota_micro.vtk
-
-fin results/gota_osc/2d/gota_micro_3.msh
-fout results/gota_osc/2d/gota_micro_3.vtk
-fin results/gota_osc/3d/fab_teste/gota_m3.msh
-fout results/gota_osc/3d/fab_teste/gota_m3.vtk
-fin results/gota_osc/3d/prolate2/gota_m2.msh
-fout results/gota_osc/3d/prolate2/m2/gota_m2.vtk
-fin results/gota_osc/3d/gota_m1.msh
-fout results/gota_osc/3d/gota_m1.vtk
-
-fin  results/static_drop/2d/mesh/drop.msh
-fout results/static_drop/2d/mesh/drop.vtk
-
--fin results/bolhas/2_bol/gota_micro.msh
--fout results/bolhas/2_bol/bolha_2.vtk
+fin results/sol_asc/2d/tube_Nb_solid.msh
+fout results/sol_asc/2d/solid_Nb_solid_.vtk
+min results/sol_asc/2d/tube_Nb_solid.txt

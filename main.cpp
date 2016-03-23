@@ -257,8 +257,9 @@ bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
   PetscOptionsScalar("-beta2", "par vel elastica", "main.cpp", beta2, &beta2, PETSC_NULL);
   PetscOptionsScalar("-finaltime", "the simulation ends at this time.", "main.cpp", finaltime, &finaltime, PETSC_NULL);
   PetscOptionsBool("-ale", "mesh movement", "main.cpp", ale, &ale, PETSC_NULL);
-  PetscOptionsGetString(PETSC_NULL,"-fin",finaux,PETSC_MAX_PATH_LEN-1,&flg_fin); PetscOptionsGetString(PETSC_NULL,"-min",minaux,PETSC_MAX_PATH_LEN-1,&flg_min);
+  PetscOptionsGetString(PETSC_NULL,"-fin",finaux,PETSC_MAX_PATH_LEN-1,&flg_fin);
   PetscOptionsGetString(PETSC_NULL,"-fout",foutaux,PETSC_MAX_PATH_LEN-1,&flg_fout);
+  PetscOptionsGetString(PETSC_NULL,"-min",minaux,PETSC_MAX_PATH_LEN-1,&flg_min);
   PetscOptionsHasName(PETSC_NULL,"-help",&ask_help);
 
   is_bdf3            = PETSC_FALSE;
@@ -370,7 +371,7 @@ bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
 	flusoli_tags.resize(nmax);
   else
 	flusoli_tags.clear();
-  N_Solids = flusoli_tags.size();  if (N_Solids) XG.resize(N_Solids);
+  N_Solids = flusoli_tags.size();  if (N_Solids) {XG.resize(N_Solids); XG_0.resize(N_Solids);}
 
   fluidonly_tags.resize(16);  //cout << flusol_tags.max_size() << endl;
   nmax = fluidonly_tags.size();
@@ -457,17 +458,16 @@ bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
 
   if (flg_min){
     filemass.assign(minaux);
-    int N = N_Solids;
-    double mass;
+    int N = N_Solids; double mass, rad;
     ifstream is;
     is.open(filemass.c_str(),ifstream::in);
     if (!is.good()) {cout << "mass file not found" << endl;}
     for (; N > 0; N--){
-      is >> mass; //cout << mass << endl;
-      MV.push_back(mass);
+      is >> mass; is >> rad; //cout << mass << "   " << rad << endl;
+      MV.push_back(mass); RV.push_back(rad);
     }
     is.close();
-    MV.resize(N_Solids);
+    MV.resize(N_Solids), RV.resize(N_Solids);
   }
 
   //if (neumann_tags.size() + interface_tags.size() == 0 || force_pressure)
@@ -1608,7 +1608,7 @@ PetscErrorCode AppCtx::setInitialConditions()
   ////point->getCoord(X.data());
   ////cout << "HAAAA : " << X.transpose() << endl;
   //} // end point loop
-
+  XG_0 = XG;
   if (ale)
   {
 
@@ -1632,7 +1632,7 @@ PetscErrorCode AppCtx::setInitialConditions()
         // update
         if (ale)
         {
-          //double tt = time_step==0? dt : current_time;
+          XG_0 = XG;
           //calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.0, Vec_v_mid, 0.0); // Euler (tem que ser esse no começo)
           calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 0.5, Vec_v_mid, 0.0); // Adams-Bashforth
           // move the mesh
@@ -2282,10 +2282,12 @@ PetscErrorCode AppCtx::solveTimeProblem()
             VecAXPBY(Vec_v_mid, .5, .5, Vec_v_1); //  y = alpha x + beta y.
           }
         }
-        else
+        else{
+          XG_0 = XG;  //saving old mass points
           calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.5, Vec_v_mid, current_time); // Adams-Bashforth
         //  cout << "AB for mesh done" << endl;
         //calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.0, Vec_v_mid, 0.0); // Euler
+        }
         // move the mesh
         if (!try2 && !is_bdf_bdf_extrap && !is_bdf_ab)
           VecWAXPY(Vec_x_1, dt, Vec_v_mid, Vec_x_0); // Vec_x_1 = Vec_v_mid*dt + Vec_x_0

@@ -118,7 +118,7 @@ Vector solid_normal(Vector const& X, double t, int tag);
 Vector v_exact(Vector const& X, double t, int tag);
 Vector solid_veloc(Vector const& X, double t, int tag);
 Tensor feature_proj(Vector const& X, double t, int tag);
-Vector gravity();
+Vector gravity(Vector const& X);
 
 
 inline double sum_vec(std::vector<int> V){
@@ -616,8 +616,8 @@ public:
   
   int                    N_Solids;
   std::vector<int>       NN_Solids;
-  std::vector<double>    MV;  //mass vector
-  std::vector<Vector2d>  XG;
+  std::vector<double>    MV, RV;  //mass vector, radius vector
+  std::vector<Vector2d>  XG, XG_0;
 
   // mesh alias
   int           n_nodes;

@@ -2064,6 +2064,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     MatrixXd            z_coefs_c_old_trans(3,n_dofs_z_per_cell/3);   // n
     MatrixXd            z_coefs_c_new(n_dofs_z_per_cell/3, 3);        // n+1
     MatrixXd            z_coefs_c_new_trans(3,n_dofs_z_per_cell/3);   // n+1
+    MatrixXd            z_coefs_c_auo(dim, nodes_per_cell), z_coefs_c_aun(dim, nodes_per_cell);
 
     //MatrixXd            x_coefs_c_mid(nodes_per_cell, dim);       // n+utheta
     MatrixXd            x_coefs_c_mid_trans(dim, nodes_per_cell); // n+utheta
@@ -2111,8 +2112,8 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     Vector              Xc(dim);  // cell center; to compute CR element
     Vector              Uqp(dim);
     Vector              Ubqp(dim); // bble
-    Vector              Uqp_old(dim);  // n
-    Vector              Uqp_new(dim);  // n+1
+    Vector              Uqp_old(dim), Zqp_old(dim); // n
+    Vector              Uqp_new(dim), Zqp_new(dim); // n+1
     Vector              dUqp_old(dim);  // n
     Vector              dUqp_vold(dim);  // n
     Vector              Vqp(dim);
@@ -2136,6 +2137,15 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     double              delk=0;
     double              delta_cd;
     double              rho;
+    double ddt_factor;
+    if (is_bdf2 && time_step > 0)
+      ddt_factor = 1.5;
+    else
+    if (is_bdf3 && time_step > 1)
+      ddt_factor = 11./6.;
+    else
+      ddt_factor = 1.;
+
 
     MatrixXd            Aloc(n_dofs_u_per_cell, n_dofs_u_per_cell);
     MatrixXd            Gloc(n_dofs_u_per_cell, n_dofs_p_per_cell);
@@ -2151,11 +2161,11 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     Vector              FUb(dim);                                     // BC
     Vector              FPx(dim); // pressure gradient
 
-    MatrixXd            Z1fsloc(n_dofs_u_per_cell,nodes_per_cell*3);
-    MatrixXd            Z2fsloc(nodes_per_cell*3,n_dofs_u_per_cell);
-    MatrixXd            Z3fsloc(nodes_per_cell*3,nodes_per_cell*3);
-    MatrixXd            Z4fsloc(nodes_per_cell*3,n_dofs_p_per_cell);
-    MatrixXd            Z5fsloc(n_dofs_p_per_cell,nodes_per_cell*3);
+    MatrixXd            Z1loc(n_dofs_u_per_cell,nodes_per_cell*3);
+    MatrixXd            Z2loc(nodes_per_cell*3,n_dofs_u_per_cell);
+    MatrixXd            Z3loc(nodes_per_cell*3,nodes_per_cell*3);
+    MatrixXd            Z4loc(nodes_per_cell*3,n_dofs_p_per_cell);
+    MatrixXd            Z5loc(n_dofs_p_per_cell,nodes_per_cell*3);
 
     Vector              force_at_mid(dim);
     Vector              Res(dim);                                     // residue
@@ -2227,22 +2237,31 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
             //SV[nod_id-1] = true;  //cout << "Solid " << nod_id << " visited." << endl;
           //}
         }
-        SV_c[j]=(nod_id);
+        SV_c[j]=nod_id;
       }
-      for (int j = 0; j < nodes_per_cell; j++) {cout << SV_c[j] << " ";} cout << endl;
-      cout << mapZ_c.transpose() << endl; //VecSetOption(Vec_uzp_0, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
+      //for (int j = 0; j < nodes_per_cell; j++) {cout << SV_c[j] << " ";} cout << endl;
+      //cout << mapZ_c.transpose() << endl; //VecSetOption(Vec_uzp_0, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
+      u_coefs_c_old = MatrixXd::Zero(n_dofs_u_per_cell/dim, dim);
+      u_coefs_c_new = MatrixXd::Zero(n_dofs_u_per_cell/dim, dim);
+      z_coefs_c_old = MatrixXd::Zero(n_dofs_z_per_cell/3, 3);
+      z_coefs_c_new = MatrixXd::Zero(n_dofs_z_per_cell/3, 3);
+      z_coefs_c_auo = MatrixXd::Zero(dim,nodes_per_cell);
+      z_coefs_c_aun = MatrixXd::Zero(dim,nodes_per_cell);
+      VecSetOption(Vec_uzp_0, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
+      VecSetOption(Vec_uzp_k, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
+
       if ((is_bdf2 && time_step > 0) || (is_bdf3 && time_step > 1))
         VecGetValues(Vec_v_1, mapM_c.size(), mapM_c.data(), v_coefs_c_mid.data());
       else
         VecGetValues(Vec_v_mid, mapM_c.size(), mapM_c.data(), v_coefs_c_mid.data());  //cout << v_coefs_c_mid << endl << endl;//size of vector mapM_c
       VecGetValues(Vec_x_0,     mapM_c.size(), mapM_c.data(), x_coefs_c_old.data());  //cout << x_coefs_c_old << endl << endl;
       VecGetValues(Vec_x_1,     mapM_c.size(), mapM_c.data(), x_coefs_c_new.data());  //cout << x_coefs_c_new << endl << endl;
-      VecGetValues(Vec_uzp_0,    mapU_c.size(), mapU_c.data(), u_coefs_c_old.data());  //cout << u_coefs_c_old << endl << endl;
-      VecGetValues(Vec_uzp_k,    mapU_c.size(), mapU_c.data(), u_coefs_c_new.data());  //cout << u_coefs_c_new << endl << endl;
-      VecGetValues(Vec_uzp_0,    mapP_c.size(), mapP_c.data(), p_coefs_c_old.data());  //cout << p_coefs_c_old << endl << endl;
-      VecGetValues(Vec_uzp_k,    mapP_c.size(), mapP_c.data(), p_coefs_c_new.data());  //cout << p_coefs_c_new << endl << endl;
-      VecGetValues(Vec_uzp_0,    mapZ_c.size(), mapZ_c.data(), z_coefs_c_old.data());  //cout << z_coefs_c_old << endl << endl;
-      VecGetValues(Vec_uzp_k,    mapZ_c.size(), mapZ_c.data(), z_coefs_c_new.data());  //cout << z_coefs_c_new << endl << endl;
+      VecGetValues(Vec_uzp_0,    mapU_c.size(), mapU_c.data(), u_coefs_c_old.data()); //cout << u_coefs_c_old << endl << endl;
+      VecGetValues(Vec_uzp_k,    mapU_c.size(), mapU_c.data(), u_coefs_c_new.data()); //cout << u_coefs_c_new << endl << endl;
+      VecGetValues(Vec_uzp_0,    mapP_c.size(), mapP_c.data(), p_coefs_c_old.data()); //cout << p_coefs_c_old << endl << endl;
+      VecGetValues(Vec_uzp_k,    mapP_c.size(), mapP_c.data(), p_coefs_c_new.data()); //cout << p_coefs_c_new << endl << endl;
+      VecGetValues(Vec_uzp_0,    mapZ_c.size(), mapZ_c.data(), z_coefs_c_old.data()); //cout << z_coefs_c_old << endl << endl;
+      VecGetValues(Vec_uzp_k,    mapZ_c.size(), mapZ_c.data(), z_coefs_c_new.data()); //cout << z_coefs_c_new << endl << endl;
 
       VecGetValues(Vec_duzp,    mapU_c.size(), mapU_c.data(), du_coefs_c_old.data()); // bdf2,bdf3
       if (is_bdf3)
@@ -2279,14 +2298,6 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       FZloc.setZero();
       FPloc.setZero();
       Eloc.setZero();
-      double ddt_factor;
-      if (is_bdf2 && time_step > 0)
-        ddt_factor = 1.5;
-      else
-      if (is_bdf3 && time_step > 1)
-        ddt_factor = 11./6.;
-      else
-        ddt_factor = 1.;
 
 
       if (behaviors & BH_bble_condens_PnPn) // reset matrices
@@ -2389,7 +2400,16 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
         //Vqp = v_exact(Xqp, current_time+dt/2., tag);
         Uconv_qp = Uqp - Vqp;
         //Uconv_qp = Uqp_old;
-        dUdt     = (Uqp_new-Uqp_old)/dt;
+        for (int l = 0; l < nodes_per_cell; l++){
+          if (SV_c[l]){
+            z_coefs_c_auo.col(l) = SolidVel(Xqp, XG_0[SV_c[l]-1], z_coefs_c_old_trans.col(l));
+            z_coefs_c_aun.col(l) = SolidVel(Xqp, XG[SV_c[l]-1], z_coefs_c_new_trans.col(l));
+          }
+        }
+        Zqp_new  = z_coefs_c_aun * phi_c[qp];
+        Zqp_old  = z_coefs_c_auo * phi_c[qp];
+
+        dUdt     = (Uqp_new-Uqp_old)/dt + (Zqp_new-Zqp_old)/dt;
 
         if (is_bdf2 && time_step > 0)
         {
@@ -2443,10 +2463,10 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
           for (int c = 0; c < dim; ++c)
           {
             FUloc(i*dim + c) += JxW_mid*
-                  ( rho*(unsteady*dUdt(c) + has_convec*Uconv_qp.dot(dxU.row(c)))*phi_c[qp][i] + // aceleração
-                    visc*dxphi_c.row(i).dot(dxU.row(c) + dxU.col(c).transpose()) - //rigidez  //transpose() here is to add 2 row-vectors
-                    force_at_mid(c)*phi_c[qp][i] -// força
-                    Pqp_new*dxphi_c(i,c) );  // pressão
+                 ( rho*(unsteady*dUdt(c) + has_convec*Uconv_qp.dot(dxU.row(c)))*phi_c[qp][i] + //aceleração
+                   visc*dxphi_c.row(i).dot(dxU.row(c) + dxU.col(c).transpose()) - //rigidez  //transpose() here is to add 2 row-vectors
+                   force_at_mid(c)*phi_c[qp][i] - //força
+                   Pqp_new*dxphi_c(i,c) );        //pressão
 
             for (int j = 0; j < n_dofs_u_per_cell/dim; ++j)
             {
@@ -2454,9 +2474,9 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
               {
                 delta_cd = c==d;
                 Aloc(i*dim + c, j*dim + d) += JxW_mid*
-                                              ( has_convec*phi_c[qp][i]*utheta *rho*( delta_cd*Uconv_qp.dot(dxphi_c.row(j))  +  dxU(c,d)*phi_c[qp][j] )   // advecção
-                                             + ddt_factor* unsteady* delta_cd*rho*phi_c[qp][i]*phi_c[qp][j]/dt     // time derivative
-                                              + utheta*visc*( delta_cd * dxphi_c.row(i).dot(dxphi_c.row(j)) + dxphi_c(i,d)*dxphi_c(j,c))   ); // rigidez
+                    ( has_convec*phi_c[qp][i]*utheta *rho*( delta_cd*Uconv_qp.dot(dxphi_c.row(j)) + dxU(c,d)*phi_c[qp][j] ) + //advecção
+                      ddt_factor* unsteady* delta_cd*rho*phi_c[qp][i]*phi_c[qp][j]/dt + //time derivative
+                      utheta*visc*( delta_cd * dxphi_c.row(i).dot(dxphi_c.row(j)) + dxphi_c(i,d)*dxphi_c(j,c)) ); //rigidez
 
               }
             }
@@ -2470,24 +2490,14 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
             }
 
           }
-
-          //FUloc.segment(i*dim,dim) += JxW_mid*
-          //                        (   phi_c[qp][i]*rho* (  dUdt + has_convec* dxU*Uconv_qp  ) // aceleração
-          //                          + visc* ( dxU + dxU.transpose() )*dxphi_c.row(i).transpose()       //rigidez
-          //                          - Pqp_new*dxphi_c.row(i).transpose() // pressão
-          //                          - phi_c[qp][i]* force_at_mid   ); // força
-
         }
+
         for (int i = 0; i < n_dofs_p_per_cell; ++i)
           FPloc(i) -= JxW_mid* dxU.trace()*psi_c[qp][i];
           //FPloc(i) -= JxW_new* dxU_new.trace() *psi_c[qp][i];
 
-        //for (int j = 0; j < cell->numFacets(); ++j){
-         // tag = mesh->getFacetPtr(cell->getFacetId(j))->getTag();
-          //fac_id = is_in_id(tag,flusoli_tags);
-        //}
-
         if (sum_vec(SV_c)){
+          // residue
           for (int I = 0; I < nodes_per_cell; I++){
             int K = SV_c[I];
             if (K != 0){
@@ -2517,23 +2527,31 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
                       rho*(unsteady*dUdt.dot(auxRotv) + has_convec*Uconv_qp.dot(auxRotv))*phi_c[qp][I] +
                       visc*(DobCont(dxU,auxTenv)+DobCont(dxU.transpose(),auxTenv)) -
                       force_at_mid.dot(auxRotv)*phi_c[qp][I] -
-                      Pqp_new*auxTenv.trace()
-                      //rho*(unsteady*dUdt.dot(auxRotf) + has_convec*Uconv_qp.dot(auxRotf))*phi_c[qp][I] +
-                      //visc*(DobCont(dxU,auxTenf)+DobCont(dxU.transpose(),aunxTenf)) -
-                      //force_at_mid.dot(auxRotf)*phi_c[qp][I] -
-                      //Pqp_new*auxTenf.trace()
-                          );
-
-/*
-                      ( rho*(unsteady*dUdt(C) + has_convec*Uconv_qp.dot(dxU.row(C)))*phi_c[qp][I] + // aceleração
-                        visc*dxphi_c.row(I).dot(dxU.row(C) + dxU.col(C).transpose()) - //rigidez  //transpose() here is to add 2 row-vectors
-                        force_at_mid(C)*phi_c[qp][I] -// força
-                        Pqp_new*dxphi_c(I,C) );
-*/                }
+                      Pqp_new*auxTenv.trace() );
+                }
               }
             }
           }
-        }
+          // jacobian
+          for (int J = 0; J < nodes_per_cell; J++){
+            int K = SV_c[J];
+            if (K != 0){
+              for (int c = 0; c < dim; c++){
+                for (int i = 0; i < n_dofs_u_per_cell/dim; i++){
+                  for (int D = 0; D < 3; D++){
+                    //Z1loc(i*dim+c,J*3+D) =
+                  }
+                }
+              }
+            }
+          }
+
+        }  //endif sum_vec
+
+
+
+
+
 #if(false)
         // ----------------
         //
@@ -2854,14 +2872,14 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
   {
     VectorXd   FZsloc(3);
     VectorXi   mapZ_s(3);
-    MatrixXd   z_coefs_old(3);
-    MatrixXd   z_coefs_new(3);
+    VectorXd   z_coefs_old(3);
+    VectorXd   z_coefs_new(3);
     Vector     dZdt(3);
     Vector     Grav;
 
 
     for (int K = 0; K < N_Solids; K++){
-      Grav = gravity();
+      Grav = gravity(XG[K]);
       for (int C = 0; C < 3; C++){
         mapZ_s(C) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
                                                      + 3*(K+1) - 2 + C;
@@ -2874,12 +2892,13 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
           FZsloc(C) = MV[K]*dZdt(C) - MV[K]*Grav(C);
         }
         else{
-          FZsloc(C) = MV[K]*dZdt(C);  // + intertia tensor component instead of dZdt
+          FZsloc(C) = 0.4*MV[K]*RV[K]*RV[K]*dZdt(C);  // + intertia tensor component instead of dZdt
         }
       }
+      VecSetValues(Vec_fun_fs, mapZ_s.size(), mapZ_s.data(), FZsloc.data(), ADD_VALUES);
     }
   }
-
+#if (false)
   // LOOP NAS FACES DO CONTORNO (Neumann)
   //~ FEP_PRAGMA_OMP(parallel default(none) shared(Vec_uzp_k,Vec_fun_fs,cout))
   {
@@ -3109,7 +3128,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
 
 
   } // end LOOP NAS FACES DO CONTORNO (Neumann)
-
+#endif
 
   // LINHA DE CONTATO
   //FEP_PRAGMA_OMP(parallel shared(Vec_uzp_k,Vec_fun_fs,cout) default(none))

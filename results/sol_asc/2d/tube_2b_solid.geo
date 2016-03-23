@@ -95,6 +95,6 @@ Physical Surface(physicalTagOutsideBubble) = {1};
 //Physical Surface(physicalTagInsideBubble) = {2:N+1};
 Physical Point(physicalTagFixedPoints) = {3*N+1:3*N+4};
 
-//Reverse Surface { 1:6 };
+Reverse Surface { 1 };
 
 

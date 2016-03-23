@@ -13,7 +13,7 @@ const double pi2 = pi*pi;
 double pho(Vector const& X, int tag);
 double gama(Vector const& X, double t, int tag);
 double muu(int tag);
-Vector force(Vector const& X, double t, int tag);
+Vector force(Vector const& X, double t, int tag);   //density*gravity (force/vol)
 Vector u_exact(Vector const& X, double t, int tag);
 double p_exact(Vector const& X, double t, int tag);
 Vector z_exact(Vector const& X, double t, int tag);
@@ -25,7 +25,7 @@ double p_initial(Vector const& X, int tag);
 Vector z_initial(Vector const& X, int tag);
 Vector solid_normal(Vector const& X, double t, int tag);
 Tensor feature_proj(Vector const& X, double t, int tag);
-Vector gravity();
+Vector gravity(Vector const& X);
 
 
 // gota estática 2d/////////////////////////////////////////////////////////////
@@ -251,7 +251,7 @@ Vector force(Vector const& X, double t, int tag)
   return f;
 }
 
-Vector gravity(){
+Vector gravity(Vector const& X){
   double x = X(0);
   double y = X(1);
 
