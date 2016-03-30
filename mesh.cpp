@@ -210,7 +210,7 @@ void AppCtx::getVecNormals(Vec const* Vec_x_1, Vec & Vec_normal_)
 
     dof_handler[DH_MESH].getVariable(VAR_M).getFacetDofs(map.data(), &*facet);
 
-    mesh->getFacetNodesId(&*facet, facet_nodes.data());
+    mesh->getFacetNodesId(&*facet, facet_nodes.data()); //std::cout << facet_nodes.transpose();
     if (virtual_mesh)
       VecGetValues(*Vec_x_1, map.size(), map.data(), x_coefs.data());
     else
@@ -369,7 +369,7 @@ void AppCtx::getVecNormals(Vec const* Vec_x_1, Vec & Vec_normal_)
       if (contrib_1)
         VecSetValues(Vec_normal_, dim, map.data()+1*dim, normal.data(), ADD_VALUES);
       //if (is_surface)
-      //  cout << "normal = " << normal(0) << " " << normal(1) << endl;
+      //cout << "normal = " << normal(0) << " " << normal(1) << endl;
     }
     else if(mesh_cell_type == TRIANGLE6) // dividi a aresta em duas partes
     {
@@ -1205,7 +1205,7 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
       tag = point->getTag();
 
       getNodeDofs(&*point, DH_MESH, VAR_M, node_dofs_mesh.data());
-      getNodeDofs(&*point, DH_UNKS, VAR_U, node_dofs_fluid.data());  //borrar!
+      //getNodeDofs(&*point, DH_UNKS, VAR_U, node_dofs_fluid.data());  //borrar!
 
       if (!fluidonly_tags.empty() && (dim == 2)){
         nod_id = is_in_id(tag,flusoli_tags);
@@ -1281,9 +1281,9 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
         else
         //if (is_in(tag, interface_tags) || is_in(tag, triple_tags) || is_in(tag, solid_tags) || is_in(tag,feature_tags))
         {
-          VecGetValues(Vec_up_0,  dim, node_dofs_fluid.data(), U0.data());
-          VecGetValues(Vec_up_1,  dim, node_dofs_fluid.data(), U1.data());
-          tmp = vtheta*U1 + (1.-vtheta)*U0;
+          //VecGetValues(Vec_up_0,  dim, node_dofs_fluid.data(), U0.data());
+          //VecGetValues(Vec_up_1,  dim, node_dofs_fluid.data(), U1.data());
+          //tmp = vtheta*U1 + (1.-vtheta)*U0;
 
 //          VecSetValues(Vec_v_mid, dim, node_dofs_mesh.data(), tmp.data(), INSERT_VALUES);
           if (!fluidonly_tags.empty() && (dim == 2)){
@@ -1301,8 +1301,8 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
               }
             }
             else{
-              VecGetValues(Vec_up_0,  dim, node_dofs_fluid.data(), U0.data());
-              VecGetValues(Vec_up_1,  dim, node_dofs_fluid.data(), U1.data());
+              VecGetValues(Vec_up_0,  dim, node_dofs_fluid_fs.data(), U0.data());
+              VecGetValues(Vec_up_1,  dim, node_dofs_fluid_fs.data(), U1.data());
               tmp = vtheta*U1 + (1.-vtheta)*U0;  //VecNorm(difff,NORM_2,&nrm);  cout << "\n" << nrm << endl;
               VecSetValues(Vec_v_mid, dim, node_dofs_mesh.data(), tmp.data(), INSERT_VALUES);
             }

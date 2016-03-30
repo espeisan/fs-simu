@@ -192,14 +192,14 @@ Tensor feature_proj(Vector const& X, double t, int tag)
 
 double pho(Vector const& X, int tag)
 {
-  if (tag == 15)
-  {
-    return 1e3;
-  }
-  else
-  {
-    return 0.0;
-  }
+//  if (tag == 15)
+//  {
+    return 1e4;
+//  }
+//  else
+//  {
+//    return 0.0;
+//  }
 }
 
 double cos_theta0()
@@ -224,14 +224,14 @@ double gama(Vector const& X, double t, int tag)
 
 double muu(int tag)
 {
-  if (tag == 15)
-  {
+//  if (tag == 15)
+//  {
     return 1.0;
-  }
-  else
-  {
-    return 0.0;
-  }
+//  }
+//  else
+//  {
+//    return 0.0;
+//  }
 }
 
 Vector force(Vector const& X, double t, int tag)
@@ -240,14 +240,14 @@ Vector force(Vector const& X, double t, int tag)
   double y = X(1);
 
   Vector f(Vector::Zero(X.size()));
-  if (tag == 15)
-  {
-    f(1) = -8e-4*1e3;//*1e3;
-  }
-  else
-  {
-    f(1) = 0.0;  //-8e-4*1e4;
-  }
+//  if (tag == 15)
+//  {
+    f(1) = -8e-4*1e4;//*1e3;
+//
+//  else
+//  {
+//    f(1) = 0.0;  //-8e-4*1e4;
+//  }
   return f;
 }
 
@@ -273,7 +273,7 @@ Vector u_exact(Vector const& X, double t, int tag)
   double x = X(0);
   double y = X(1);
   double un = 998*9.8*2.85e-4*2.85e-4/(3*1e-3);
-  Vector v(Vector::Zero(X.size()));
+  Vector v(Vector::Zero(X.size()));//(Vector::Noes(X.size()));
 
   return v;
 }
@@ -290,7 +290,7 @@ Tensor grad_u_exact(Vector const& X, double t, int tag)
 Vector z_exact(Vector const& X, double t, int tag)
 {
   Vector v(Vector::Zero(3));
-  v << 3.14, 722, 3.1416;
+  //v << 1.1, 2.2, 3.3;
   return v;
 }
 

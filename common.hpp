@@ -121,11 +121,11 @@ Tensor feature_proj(Vector const& X, double t, int tag);
 Vector gravity(Vector const& X);
 
 
-inline double sum_vec(std::vector<int> V){
-  int sum = 0;
-  for (unsigned int i = 0; i < V.size(); i++) {sum = sum + V[i];}
-  return sum;
-}
+//inline double sum_vec(std::vector<int> V){
+//  int sum = 0;
+//  for (unsigned int i = 0; i < V.size(); i++) {sum = sum + V[i];}
+//  return sum;
+//}
 
 inline double sqr(double v) {return v*v;}
 
@@ -274,6 +274,12 @@ inline double DobCont(Tensor const& A, Tensor const& B){
   double d = 0;
   for (int i = 0; i < A.rows(); i++) {d += A.row(i).dot(B.row(i));}
   return d;
+}
+
+inline std::vector<Vector2d> midGP(std::vector<Vector2d> XG, std::vector<Vector2d> XG_0, double utheta, int N){
+  std::vector<Vector2d> XG_mid(N);
+  for (int i = 0; i < N; i++){XG_mid[i] = utheta*XG[i] + (1.-utheta)*XG_0[i];}
+  return XG_mid;
 }
 
 
@@ -618,6 +624,7 @@ public:
   std::vector<int>       NN_Solids;
   std::vector<double>    MV, RV;  //mass vector, radius vector
   std::vector<Vector2d>  XG, XG_0;
+  //bool                   casevar = true, casevarc = true; //case variable or const to H solid vel functional
 
   // mesh alias
   int           n_nodes;
