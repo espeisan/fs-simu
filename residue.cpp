@@ -158,7 +158,7 @@ void getProjectorMatrix(MatrixBase<Derived> & P, int n_nodes, int const* nodes, 
 } // end getProjectorMatrix
 
 
-
+#if (false)
 // ******************************************************************************
 //                            FORM FUNCTION
 // ******************************************************************************
@@ -1593,7 +1593,7 @@ PetscErrorCode AppCtx::formJacobian(SNES snes,Vec Vec_up_k, Mat* /*Mat_Jac*/, Ma
 
   PetscFunctionReturn(0);
 }
-
+#endif
 // ====================================================================================================
 
 // to apply boundary conditions on linear elasticity problem.
@@ -1603,7 +1603,7 @@ void getProjectorBC(MatrixBase<Derived> & P, int n_nodes, int const* nodes, Vec 
   int const dim = app.dim;
   Mesh const* mesh = &*app.mesh;
   //DofHandler const* dof_handler = &*app.dof_handler;
-  std::vector<int> const& dirichlet_tags  = app.dirichlet_tags;
+  std::vector<int> const& dirichlet_tags  = app.dirichlet_tags; std::vector<int> const& flusoli_tags  = app.flusoli_tags;
   std::vector<int> const& neumann_tags    = app.neumann_tags  ;
   std::vector<int> const& interface_tags  = app.interface_tags;
   std::vector<int> const& solid_tags      = app.solid_tags    ;
@@ -1678,7 +1678,7 @@ void getProjectorBC(MatrixBase<Derived> & P, int n_nodes, int const* nodes, Vec 
     }
     else
     //if (is_in(tag,triple_tags) || is_in(tag,dirichlet_tags) || is_in(tag,neumann_tags) || is_in(tag,periodic_tags) || is_in(tag,feature_tags))
-    if (is_in(tag,triple_tags) || is_in(tag,dirichlet_tags) || is_in(tag,neumann_tags) || is_in(tag,periodic_tags))
+    if (is_in(tag,triple_tags) || is_in(tag,dirichlet_tags) || is_in(tag,neumann_tags) || is_in(tag,periodic_tags) || is_in(tag,flusoli_tags))
     {
       P.block(i*dim,i*dim,dim,dim) = Z;
     }
@@ -1742,7 +1742,7 @@ PetscErrorCode AppCtx::formFunction_mesh(SNES /*snes_m*/, Vec Vec_v, Vec Vec_fun
     VectorXd          Floc(n_dofs_v_per_cell);
     MatrixXd          Aloc(n_dofs_v_per_cell, n_dofs_v_per_cell);
 
-    VectorXi          mapV_c(n_dofs_u_per_cell);  //TODO: i think is n_dofs_v_per_cell
+    VectorXi          mapV_c(n_dofs_v_per_cell), mapU_c(n_dofs_u_per_cell);  //TODO: i think is n_dofs_v_per_cell
 
     MatrixXd          Prj(n_dofs_v_per_cell, n_dofs_v_per_cell);
     VectorXi          cell_nodes(nodes_per_cell);
@@ -1763,8 +1763,8 @@ PetscErrorCode AppCtx::formFunction_mesh(SNES /*snes_m*/, Vec Vec_v, Vec Vec_fun
 
       // mapeamento do local para o global: (ID local para ID global)
       // mapV_c saves global IDs for cell's nodes unknowns enumeration
-      dof_handler[DH_MESH].getVariable(VAR_M).getCellDofs(mapV_c.data(), &*cell);  //cout << mapV_c << endl;
-
+      dof_handler[DH_MESH].getVariable(VAR_M).getCellDofs(mapV_c.data(), &*cell);  //cout << mapV_c.transpose() << endl;
+      dof_handler[DH_UNKM].getVariable(VAR_U).getCellDofs(mapU_c.data(), &*cell);  //cout << mapU_c.transpose() << endl;
       /*  Pega os valores das variáveis nos graus de liberdade */
       VecGetValues(Vec_v ,  mapV_c.size(), mapV_c.data(), v_coefs_c.data());  //cout << v_coefs_c << endl;//VecView(Vec_v,PETSC_VIEWER_STDOUT_WORLD);
       VecGetValues(Vec_x_0, mapV_c.size(), mapV_c.data(), x_coefs_c.data());  //cout << x_coefs_c << endl;
@@ -1878,9 +1878,9 @@ PetscErrorCode AppCtx::formFunction_mesh(SNES /*snes_m*/, Vec Vec_v, Vec Vec_fun
       // Projection - to force non-penetrarion bc
       mesh->getCellNodesId(&*cell, cell_nodes.data());
       getProjectorBC(Prj, nodes_per_cell, cell_nodes.data(), Vec_x_0, current_time, *this /*AppCtx*/);
-
-      Floc = Prj*Floc;
-      Aloc = Prj*Aloc*Prj;
+      //cout << Floc.transpose() << endl;
+      Floc = Prj*Floc;  //cout << Floc.transpose() << endl;
+      Aloc = Prj*Aloc*Prj;  //zeros at dirichlet nodes (lines and columns)
 
 #ifdef FEP_HAS_OPENMP
       FEP_PRAGMA_OMP(critical)
@@ -1893,7 +1893,7 @@ PetscErrorCode AppCtx::formFunction_mesh(SNES /*snes_m*/, Vec Vec_v, Vec Vec_fun
 
 
   } // end parallel
-
+  //Assembly(*JJ); View(*JJ, "ElastOpAntes", "JJ");
 
   // boundary conditions on global Jacobian
     // solid & triple tags .. force normal
@@ -1915,7 +1915,7 @@ PetscErrorCode AppCtx::formFunction_mesh(SNES /*snes_m*/, Vec Vec_v, Vec Vec_fun
             is_in(tag,solid_tags)     ||
             is_in(tag,interface_tags) ||
             is_in(tag,triple_tags)    ||
-            is_in(tag,dirichlet_tags) ||
+            is_in(tag,dirichlet_tags) || is_in(tag,flusoli_tags) ||
             is_in(tag,neumann_tags)   ||
             is_in(tag,periodic_tags)     )  )
         continue;
@@ -1929,8 +1929,8 @@ PetscErrorCode AppCtx::formFunction_mesh(SNES /*snes_m*/, Vec Vec_v, Vec Vec_fun
     }
   }
 
-  Assembly(*JJ); //MatView(*JJ,PETSC_VIEWER_STDOUT_WORLD);
-  Assembly(Vec_fun);
+  Assembly(*JJ); View(*JJ, "matrizes/jac.m", "jac"); //MatView(*JJ,PETSC_VIEWER_STDOUT_WORLD);
+  Assembly(Vec_fun);  View(Vec_fun, "matrizes/rhs.m", "res");
 
   //View(*JJ, "ElastOp", "JJ");
 
@@ -2387,7 +2387,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
         if (SFI){
           for (int J = 0; J < nodes_per_cell; J++){
             if (SV_c[J]){
-              mesh->getNodePtr(cell->getNodeId(J))->getCoord(XIp.data(),dim);
+              //mesh->getNodePtr(cell->getNodeId(J))->getCoord(XIp.data(),dim);
               XJp_old = x_coefs_c_old_trans.col(J);
               XJp_new = x_coefs_c_new_trans.col(J);
               XJp = x_coefs_c_mid_trans.col(J);
@@ -2398,16 +2398,17 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
               uz_coefs_c.col(J)    = SolidVel(XJp,XG_mid[SV_c[J]-1],z_coefs_c_mid_trans.col(J));
             }
           }
+
+          dxZ      = uz_coefs_c * dLphi_c[qp] * invF_c_mid;  //cout << dxZ << endl;
+          Zqp_new  = z_coefs_c_aun * phi_c[qp];              //cout << Zqp_new << endl;
+          Zqp_old  = z_coefs_c_auo * phi_c[qp];              //cout << Zqp_old << endl;
+          Zqp      = uz_coefs_c * phi_c[qp];                 //cout << Zqp << endl;
+
+          dUdt     += (Zqp_new-Zqp_old)/dt;
+          dxU      += dxZ;                    //cout << dxU << endl;
+          Uconv_qp += Zqp;
         }
 
-        dxZ      = uz_coefs_c * dLphi_c[qp] * invF_c_mid;  //cout << dxZ << endl;
-        Zqp_new  = z_coefs_c_aun * phi_c[qp];              //cout << Zqp_new << endl;
-        Zqp_old  = z_coefs_c_auo * phi_c[qp];              //cout << Zqp_old << endl;
-        Zqp      = uz_coefs_c * phi_c[qp];                 //cout << Zqp << endl;
-
-        dUdt     += (Zqp_new-Zqp_old)/dt;
-        dxU      += dxZ;                    //cout << dxU << endl;
-        Uconv_qp += Zqp;
 
         if (is_bdf2 && time_step > 0)
         {
@@ -2955,13 +2956,12 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
 
         FUloc += a*Gnx*iBbb*FPx - b*Bnb*FPx - b*Gnx*FUb;
       }
-
+#endif  //for debug
 
 //cout << "\n" << FUloc << endl; cout << "\n" << Aloc << endl; cout << "\n" << Gloc << endl; cout << "\n" << Dloc << endl;
       // Projection - to force non-penetrarion bc
       mesh->getCellNodesId(&*cell, cell_nodes.data());
       getProjectorMatrix(Prj, nodes_per_cell, cell_nodes.data(), Vec_x_1, current_time+dt, *this);
-//cout << Prj << endl;
       FUloc = Prj*FUloc;
       Aloc = Prj*Aloc*Prj;
       Gloc = Prj*Gloc;
@@ -2982,12 +2982,13 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
           }
         }
       }
-#endif  //for debug
+
 #ifdef FEP_HAS_OPENMP
       FEP_PRAGMA_OMP(critical)
 #endif
       {
         VecSetValues(Vec_fun_fs, mapU_c.size(), mapU_c.data(), FUloc.data(), ADD_VALUES);
+        VecSetValues(Vec_fun_fs, mapZ_c.size(), mapZ_c.data(), FZloc.data(), ADD_VALUES);
         VecSetValues(Vec_fun_fs, mapP_c.size(), mapP_c.data(), FPloc.data(), ADD_VALUES);
 
         MatSetValues(*JJ, mapU_c.size(), mapU_c.data(), mapU_c.size(), mapU_c.data(), Aloc.data(), ADD_VALUES);
@@ -3001,7 +3002,8 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
         MatSetValues(*JJ, mapZ_c.size(), mapZ_c.data(), mapP_c.size(), mapP_c.data(), Z4loc.data(), ADD_VALUES);
         MatSetValues(*JJ, mapP_c.size(), mapP_c.data(), mapZ_c.size(), mapZ_c.data(), Z5loc.data(), ADD_VALUES);
       }
-
+      Assembly(Vec_fun_fs); Assembly(*JJ);
+      View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
     }  //end for cell
 
 
@@ -3022,24 +3024,25 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       for (int C = 0; C < 3; C++){
         mapZ_s(C) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
                                                      + 3*(K+1) - 2 + C;
-      }
-      VecGetValues(Vec_uzp_0,    mapZ_s.size(), mapZ_s.data(), z_coefs_old.data());
-      VecGetValues(Vec_uzp_k ,   mapZ_s.size(), mapZ_s.data(), z_coefs_new.data());
+      }  //cout << mapZ_s << endl;
+      VecGetValues(Vec_uzp_0,    mapZ_s.size(), mapZ_s.data(), z_coefs_old.data());  //cout << z_coefs_old.transpose() << endl;
+      VecGetValues(Vec_uzp_k ,   mapZ_s.size(), mapZ_s.data(), z_coefs_new.data());  //cout << z_coefs_new.transpose() << endl;
       dZdt = (z_coefs_new - z_coefs_old)/dt;
       for (int C = 0; C < 3; C++){
         if (C < 2){
-          FZsloc(C) = MV[K]*dZdt(C) - MV[K]*Grav(C);
-          Z3sloc(C,C) = MV[K];
+          FZsloc(C) = MV[K]*dZdt(C) - MV[K]*Grav(C) +8;
+          Z3sloc(C,C) = MV[K]/dt;
         }
         else{
           FZsloc(C) = 0.4*MV[K]*RV[K]*RV[K]*dZdt(C);
-          Z3sloc(C,C) = 0.4*MV[K]*RV[K]*RV[K];
+          Z3sloc(C,C) = 0.4*MV[K]*RV[K]*RV[K]/dt;
         }
       }
       VecSetValues(Vec_fun_fs, mapZ_s.size(), mapZ_s.data(), FZsloc.data(), ADD_VALUES);
       MatSetValues(*JJ, mapZ_s.size(), mapZ_s.data(), mapZ_s.size(), mapZ_s.data(), Z3sloc.data(), ADD_VALUES);
     }
-
+    Assembly(Vec_fun_fs); Assembly(*JJ);
+    View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
   }
 
 #if (false)
@@ -3612,6 +3615,8 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     MatSetValues(*JJ, 1, &null_space_press_dof, 1, &null_space_press_dof, &p, ADD_VALUES);
   }
 
+  Assembly(Vec_fun_fs); Assembly(*JJ);
+  View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
   if(print_to_matlab)
   {
     static bool ja_foi=false;
@@ -3623,10 +3628,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     ja_foi = true;
 
   }
-
-  Assembly(Vec_fun_fs);
-  Assembly(*JJ);
-
+  //MatZeroEntries(*JJ); SNESGetJacobian(snes_fs, JJ, NULL, NULL, NULL); Assembly(*JJ);
   PetscFunctionReturn(0);
 
 } // END formFunction

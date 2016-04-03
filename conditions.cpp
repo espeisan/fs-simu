@@ -242,7 +242,7 @@ Vector force(Vector const& X, double t, int tag)
   Vector f(Vector::Zero(X.size()));
 //  if (tag == 15)
 //  {
-    f(1) = -8e-4*1e4;//*1e3;
+    //f(1) = -8e-4*1e4;//*1e3;
 //
 //  else
 //  {
@@ -258,7 +258,7 @@ Vector gravity(Vector const& X){
   Vector f(Vector::Zero(X.size()));
   //if (tag == 15)
   //{
-    f(1) = -8e-4;  //*1e3;
+    f(1) = -10;//-8e-4;  //*1e3;
   //}
   //else
   //{
@@ -273,7 +273,8 @@ Vector u_exact(Vector const& X, double t, int tag)
   double x = X(0);
   double y = X(1);
   double un = 998*9.8*2.85e-4*2.85e-4/(3*1e-3);
-  Vector v(Vector::Zero(X.size()));//(Vector::Noes(X.size()));
+  //Vector v(Vector::Ones(X.size()));
+  Vector v(Vector::Zero(X.size()));
 
   return v;
 }
@@ -290,7 +291,7 @@ Tensor grad_u_exact(Vector const& X, double t, int tag)
 Vector z_exact(Vector const& X, double t, int tag)
 {
   Vector v(Vector::Zero(3));
-  //v << 1.1, 2.2, 3.3;
+  //Vector v(Vector::Ones(3));
   return v;
 }
 

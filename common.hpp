@@ -378,8 +378,8 @@ public:
   PetscErrorCode checkSnesConvergence(SNES snes, PetscInt it,PetscReal xnorm, PetscReal pnorm, PetscReal fnorm, SNESConvergedReason *reason);
   PetscErrorCode setUPInitialGuess();
   PetscErrorCode solveTimeProblem();
-  PetscErrorCode formJacobian(SNES /*snes*/,Vec x,Mat *Mat_Jac, Mat* /*prejac*/, MatStructure * /*flag*/);
-  PetscErrorCode formFunction(SNES /*snes*/, Vec x, Vec f);
+//  PetscErrorCode formJacobian(SNES /*snes*/,Vec x,Mat *Mat_Jac, Mat* /*prejac*/, MatStructure * /*flag*/);
+//  PetscErrorCode formFunction(SNES /*snes*/, Vec x, Vec f);
 
   PetscErrorCode formJacobian_fs(SNES /*snes*/,Vec x,Mat *Mat_Jac, Mat* /*prejac*/, MatStructure * /*flag*/);
   PetscErrorCode formFunction_fs(SNES /*snes*/, Vec x, Vec f);
@@ -437,7 +437,7 @@ public:
   Vector getAreaMassCenterSolid(int solid);
   double getMeshVolume();
   double getMaxVelocity();
-  void printContactAngle(bool _print);
+  //void printContactAngle(bool _print);
 
 
   void computeError(Vec const& Vec_x, Vec &Vec_up_1, double tt);
