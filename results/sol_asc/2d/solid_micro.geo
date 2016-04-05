@@ -1,14 +1,14 @@
 // Gmsh project created on Tue May 19 13:43:01 2015
-lc = 0.3;  //0.01
+lc = 0.4;  //0.01
 lb = lc;
-xc = 0.5;
-yc = 0.5;
-R = 0.2;
+xc = 1.0;
+yc = 4.0;
+R = 0.25/2;
 
 Point(1) = {0, 0, 0, lb};
-Point(2) = {1, 0, 0, lb};
-Point(3) = {1, 2, 0, lb};
-Point(4) = {0, 2, 0, lb};
+Point(2) = {2, 0, 0, lb};
+Point(3) = {2, 6, 0, lb};
+Point(4) = {0, 6, 0, lb};
 Point(5) = {xc, yc, 0, lc};
 Point(6) = {xc + R, yc, 0, lc};
 Point(7) = {xc, yc + R, 0, lc};

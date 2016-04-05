@@ -781,7 +781,7 @@ void AppCtx::dofsUpdate()
 		         +dof_handler[DH_UNKM].getVariable(VAR_Q).numPositiveDofs();
 
   //for (unsigned int l = 0; l < NN_Solids.size(); l++) cout << NN_Solids[l] << " ";
-  //cout << endl;
+  n_unknowns_u = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs();
 }
 
 PetscErrorCode AppCtx::allocPetscObjs()
@@ -1007,15 +1007,15 @@ PetscErrorCode AppCtx::allocPetscObjs()
   {
     ierr = SNESSetType(snes_m, SNESKSPONLY); CHKERRQ(ierr);
   }
-
   //ierr = SNESSetFromOptions(snes_m); CHKERRQ(ierr);  //prints newton iterations information SNES Function norm
+
 //~ #ifdef PETSC_HAVE_MUMPS
   //~ PCFactorSetMatSolverPackage(pc_m,MATSOLVERMUMPS);
 //~ #endif
 
   //ierr = SNESMonitorSet(snes_m, SNESMonitorDefault, 0, 0); CHKERRQ(ierr);
   //ierr = SNESMonitorSet(snes_m,Monitor,0,0);CHKERRQ(ierr);
-  //ierr = SNESSetTolerances(snes_m,0,0,0,13,PETSC_DEFAULT);
+  //ierr = SNESSetTolerances(snes_m,1.e-11,1.e-11,1.e-11,10,PETSC_DEFAULT);
   //ierr = SNESSetFromOptions(snes_m); CHKERRQ(ierr);
   //ierr = SNESLineSearchSet(snes_m, SNESLineSearchNo, &user); CHKERRQ(ierr);
 
@@ -1144,8 +1144,8 @@ void AppCtx::matrixColoring()
       nod_id = is_in_id(tag,flusoli_tags);
       if (nod_id){
           for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
-            mapZ_c(j*3 + l) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
-        			                         + 3*nod_id - 2 + l;
+            mapZ_c(j*3 + l) = n_unknowns_u - 1
+        			        + 3*nod_id - 2 + l;
           }
           SFI = true;
       }
@@ -1580,8 +1580,8 @@ PetscErrorCode AppCtx::setInitialConditions()
       if (!SV[nod_id-1]){
         //getNodeDofs(&*point,DH_UNKM,VAR_Z,dofs_fs.data());
         for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
-          dofs_fs(l) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
-      		    	                         + 3*nod_id - 2 + l;
+          dofs_fs(l) = n_unknowns_u - 1
+      		    	   + 3*nod_id - 2 + l;
         }
         SV[nod_id-1] = true;
       }
@@ -1604,10 +1604,10 @@ PetscErrorCode AppCtx::setInitialConditions()
 //TODO: Quitar restos del problema fluidos, aquí comienzo a quitarlos con el if (false)
   //moveMesh(Vec_x_0, Vec_up_0, Vec_up_1, 1.0, tt, Vec_x_1);
   //if (false) calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.0, Vec_v_mid, 0.0);  //borrar!
-  calcMeshVelocity(Vec_x_0, Vec_uzp_0, Vec_uzp_1, 1.0, Vec_v_mid, 0.0);  // Vec_up_0 = Vec_up_1, vtheta = 1.0, mean b.c. = Vec_up_1 = Vec_v_mid init. guess SNESSolve
+  calcMeshVelocity(Vec_x_0, Vec_uzp_0, Vec_uzp_1, 1.0, Vec_v_mid, 0.0); // Vec_up_0 = Vec_up_1, vtheta = 1.0, mean b.c. = Vec_up_1 = Vec_v_mid init. guess SNESSolve
   // move the mesh
   VecWAXPY(Vec_x_1, dt, Vec_v_mid, Vec_x_0); // Vec_x_1 = Vec_v_mid*dt + Vec_x_0 // for zero Dir. cond. solution lin. elast. is Vec_v_mid = 0
-  //VecView(Vec_v_mid,PETSC_VIEWER_STDOUT_WORLD);
+  //VecView(Vec_v_mid,PETSC_VIEWER_STDOUT_WORLD); VecView(Vec_x_0,PETSC_VIEWER_STDOUT_WORLD); VecView(Vec_x_1,PETSC_VIEWER_STDOUT_WORLD);
   //point = mesh->pointBegin();
   //point_end = mesh->pointEnd();
   //for (; point != point_end; ++point)
@@ -1629,11 +1629,11 @@ PetscErrorCode AppCtx::setInitialConditions()
         printf("\tIterations %d\n", i);
         // * SOLVE THE SYSTEM *
         if (solve_the_sys)
-        {
+        { //VecView(Vec_uzp_1,PETSC_VIEWER_STDOUT_WORLD); //VecView(Vec_uzp_0,PETSC_VIEWER_STDOUT_WORLD);
           //setUPInitialGuess();
 //          if (false) {ierr = SNESSolve(snes,PETSC_NULL,Vec_up_1);  CHKERRQ(ierr);} //borrar!
           ierr = SNESSolve(snes_fs,PETSC_NULL,Vec_uzp_1);  CHKERRQ(ierr);
-        }
+        }  //VecView(Vec_uzp_1,PETSC_VIEWER_STDOUT_WORLD);
         // * SOLVE THE SYSTEM *
 //cout << "new iter" << endl;
         // update
@@ -1651,7 +1651,7 @@ PetscErrorCode AppCtx::setInitialConditions()
             Vec Vec_x_mid;
             int xsize;
             double *xarray;
-            VecGetSize(Vec_x_0, &xsize);
+            VecGetSize(Vec_x_0, &xsize);  //VecView(Vec_res_fs,PETSC_VIEWER_STDOUT_WORLD);
             //if (false) VecGetArray(Vec_res, &xarray);  //borrar!
             VecGetArray(Vec_res_fs, &xarray);
             //prototipo no petsc-dev: VecCreateSeqWithArray(MPI_Comm comm,PetscInt bs,PetscInt n,const PetscScalar array[],Vec *V)
@@ -2035,8 +2035,8 @@ PetscErrorCode AppCtx::solveTimeProblem()
     } // end if (solve_the_system)
     if (is_bdf2)
     {
-      if (plot_exact_sol)
-//        computeError(Vec_x_0, Vec_up_0,current_time);
+      if (false && plot_exact_sol)  //TODO: actualizar el false
+        {computeError(Vec_x_0, Vec_up_0,current_time);}
 //      VecCopy(Vec_up_1, Vec_dup);
 //      VecAXPY(Vec_dup,-1.0,Vec_up_0); // Vec_dup -= Vec_up_0
 //      VecScale(Vec_dup, 1./dt);
@@ -2070,7 +2070,7 @@ PetscErrorCode AppCtx::solveTimeProblem()
     }
 //    else
     {
-      if (time_step == 0)
+      if (false && time_step == 0) //TODO: actualizar el false
       {
 //        pressureTimeCorrection(Vec_up_0, Vec_up_1, 0., 1); // press(n) = press(n+1/2) - press(n-1/2)
         if (plot_exact_sol && maxts <= 1)
@@ -2079,7 +2079,7 @@ PetscErrorCode AppCtx::solveTimeProblem()
       else
       {
 //        pressureTimeCorrection(Vec_up_0, Vec_up_1, .5, .5); // press(n) = press(n+1/2) - press(n-1/2)
-        if (plot_exact_sol)
+        if (false && plot_exact_sol)  //TODO: actualizar el false
           computeError(Vec_x_0, Vec_uzp_0,current_time);//computeError(Vec_x_0, Vec_up_0,current_time);
       }
     }
@@ -3257,16 +3257,34 @@ void GetDataVelocity::get_vec(int id, Real * vec_out) const
 {
   Point const* point = user.mesh->getNodePtr(id);
   std::vector<int> dofs(user.dim);
+  int tag = point->getTag();
+  int nod_id = is_in_id(tag,user.flusoli_tags);
+  Vector Xg(user.dim), Xp(user.dim), Z(3);
+  Vector2d  U;
 
-  user.getNodeDofs(&*point, DH_UNKS, VAR_U, dofs.data());
+  if (nod_id){
+    Xg = user.XG[nod_id-1];
+    point->getCoord(Xp.data(),user.dim);
+    for (int l = 0; l < 3; l++){
+      Z(l) = q_array[user.n_unknowns_u - 1 + 3*nod_id - 2 + l];
+    }
+    U = SolidVel(Xp,Xg,Z);
+    for (int i = 0; i < user.dim; ++i)
+      vec_out[i] = U(i);
+  }
+  else{
+    user.getNodeDofs(&*point, DH_UNKM, VAR_U, dofs.data());
+    for (int i = 0; i < user.dim; ++i)
+      vec_out[i] = q_array[*(dofs.data()+i)];
+  }
 
-  for (int i = 0; i < user.dim; ++i)
-    vec_out[i] = q_array[*(dofs.data()+i)];
 }
 
 double GetDataPressure::get_data_r(int nodeid) const
 {
   Point const*const point = user.mesh->getNodePtr(nodeid);
+  int n_solid_nodes = user.dof_handler[DH_UNKM].getVariable(VAR_Z).numPositiveDofs()/3;
+  int p_id_cor = 3*(n_solid_nodes-user.N_Solids);
   if (!user.mesh->isVertex(point))
   {
     int dofs[3];
@@ -3276,17 +3294,18 @@ double GetDataPressure::get_data_r(int nodeid) const
     if (user.dim==3)
     {
       const int edge_id = cell->getCornerId(m);
-      user.dof_handler[DH_UNKS].getVariable(VAR_P).getCornerDofs(dofs, user.mesh->getCornerPtr(edge_id));
+      user.dof_handler[DH_UNKM].getVariable(VAR_Q).getCornerDofs(dofs, user.mesh->getCornerPtr(edge_id));
     }
     else
     {
       const int edge_id = cell->getFacetId(m);
-      user.dof_handler[DH_UNKS].getVariable(VAR_P).getFacetDofs(dofs, user.mesh->getFacetPtr(edge_id));
+      user.dof_handler[DH_UNKM].getVariable(VAR_Q).getFacetDofs(dofs, user.mesh->getFacetPtr(edge_id));
     }
-    return (q_array[dofs[0]] + q_array[dofs[1]])/2.;
+    return (q_array[dofs[0] - p_id_cor] + q_array[dofs[1] - p_id_cor])/2.;
   }
   int dof;
-  user.dof_handler[DH_UNKS].getVariable(VAR_P).getVertexDofs(&dof, point);
+  user.dof_handler[DH_UNKM].getVariable(VAR_Q).getVertexDofs(&dof, point);
+  dof = dof - p_id_cor;
   return q_array[dof];
 }
 
@@ -3327,8 +3346,8 @@ int GetDataCellTag::get_data_i(int cellid) const
 }
 
 /* petsc functions*/
-extern PetscErrorCode FormJacobian(SNES,Vec,Mat*,Mat*,MatStructure*,void*);
-extern PetscErrorCode FormFunction(SNES,Vec,Vec,void*);
+//extern PetscErrorCode FormJacobian(SNES,Vec,Mat*,Mat*,MatStructure*,void*);
+//extern PetscErrorCode FormFunction(SNES,Vec,Vec,void*);
 //extern PetscErrorCode Monitor(SNES,PetscInt,PetscReal,void *);
 //extern PetscErrorCode FormJacobian(SNES,Vec,Mat*,Mat*,MatStructure*,void*);
 //extern PetscErrorCode FormFunction(SNES,Vec,Vec,void*);
@@ -3384,16 +3403,16 @@ int main(int argc, char **argv)
 //  cout << "\n# pressure unknowns: " << user.dof_handler[DH_UNKS].getVariable(VAR_P).numPositiveDofs();
 //  cout << "\n# total unknowns: " << user.n_unknowns << endl;
 //  if (!user.fluidonly_tags.empty() && (user.dim == 2)){
-    cout << "\n# velocity fluid only unknowns: " << user.dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs();
+    cout << "\n# velocity fluid only unknowns: " << user.n_unknowns_u;
     cout << "\n# velocity solid int unknowns: " << user.flusoli_tags.size()*3 << " (" <<
     		                                       user.dof_handler[DH_UNKM].getVariable(VAR_Z).numPositiveDofs()/3 << ")";
     cout << "\n# pressure unknowns: " << user.dof_handler[DH_UNKM].getVariable(VAR_Q).numPositiveDofs();
     cout << "\n# total unknowns: " << user.n_unknowns_fs; cout << "\n# solids: " << user.N_Solids << endl;
-    cout << "unknowns distribution: " << 0 << "-" << user.dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs()-1 <<
-    		", " << user.dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() << "-" <<
-			user.dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() + user.flusoli_tags.size()*3 - 1<<
-			", " << user.dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() + user.flusoli_tags.size()*3 <<
-			"-" << user.dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() + user.flusoli_tags.size()*3 +
+    cout << "unknowns distribution: " << 0 << "-" << user.n_unknowns_u-1 <<
+    		", " << user.n_unknowns_u << "-" <<
+			user.n_unknowns_u + user.flusoli_tags.size()*3 - 1<<
+			", " << user.n_unknowns_u + user.flusoli_tags.size()*3 <<
+			"-" << user.n_unknowns_u + user.flusoli_tags.size()*3 +
 			user.dof_handler[DH_UNKM].getVariable(VAR_Q).numPositiveDofs() - 1 << endl;
 //  }
   cout << endl;

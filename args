@@ -82,7 +82,7 @@ solid 2d     -dir_tags 13  -fsi_tags 14 -fonly_tags 15,13
 solid 2d 2b dir_tags 1-5,33 fsi_tags 5 fonly_tags 1-5,100,33
 solid 2d Nb dir_tags 1-6 fsi_tags 101-107 fonly_tags 1-7
 
--function_space 1
+function_space 1
 function_space 2
 function_space 3
 function_space 4
@@ -106,7 +106,7 @@ mesh_type 4096
 fin results/canal/canal_ord1.msh
 fout results/canal/canal.vtk
 
--fin results/sol_asc/2d/solid_micro.msh
+-fin results/sol_asc/2d/solid_micro_0.msh
 -fout results/sol_asc/2d/solid_micro_.vtk
 -min results/sol_asc/2d/solid_micro.txt
 

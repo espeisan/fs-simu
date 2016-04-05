@@ -2227,7 +2227,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
         if (nod_id){
           //if(!SV[nod_id-1]){
             for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
-              mapZ_c(j*3 + l) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
+              mapZ_c(j*3 + l) = n_unknowns_u - 1
           			                         + 3*nod_id - 2 + l;
             }
             //SV[nod_id-1] = true;  //cout << "Solid " << nod_id << " visited." << endl;
@@ -3100,7 +3100,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     for (int K = 0; K < N_Solids; K++){
       Grav = gravity(XG[K]);
       for (int C = 0; C < 3; C++){
-        mapZ_s(C) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
+        mapZ_s(C) = n_unknowns_u - 1
                                                      + 3*(K+1) - 2 + C;
       }
       VecGetValues(Vec_uzp_0,    mapZ_s.size(), mapZ_s.data(), z_coefs_old.data());

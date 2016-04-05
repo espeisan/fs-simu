@@ -1929,11 +1929,11 @@ PetscErrorCode AppCtx::formFunction_mesh(SNES /*snes_m*/, Vec Vec_v, Vec Vec_fun
     }
   }
 
-  Assembly(*JJ); View(*JJ, "matrizes/jac.m", "jac"); //MatView(*JJ,PETSC_VIEWER_STDOUT_WORLD);
-  Assembly(Vec_fun);  View(Vec_fun, "matrizes/rhs.m", "res");
-
+  Assembly(*JJ); //View(*JJ, "matrizes/jac.m", "Jacm"); //MatView(*JJ,PETSC_VIEWER_STDOUT_WORLD);
+  Assembly(Vec_fun);  //View(Vec_fun, "matrizes/rhs.m", "resm");
   //View(*JJ, "ElastOp", "JJ");
-
+  //double val; VecNorm(Vec_fun,NORM_2,&val); cout << "norma residuo " << val <<endl;
+  //cout << "Mesh calculation:" << endl;
   PetscFunctionReturn(0);
 }
 
@@ -1966,7 +1966,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       utheta = 0.5;
   }
 
-  std::vector<Vector2d> XG_mid = midGP(XG, XG_0, utheta, N_Solids);
+  XG_mid = midGP(XG, XG_0, utheta, N_Solids);
 
   bool const compact_bubble = false; // eliminate bubble from convective term
 
@@ -2025,7 +2025,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
 
   // LOOP NAS CÉLULAS Parallel (uncomment it)
 //#ifdef FEP_HAS_OPENMP
-//  FEP_PRAGMA_OMP(parallel default(none) shared(Vec_uzp_k,Vec_fun_fs,cout,null_space_press_dof,JJ,utheta,iter))
+//  FEP_PRAGMA_OMP(parallel default(none) shared(Vec_uzp_k,Vec_fun_fs,cout,null_space_press_dof,JJ,utheta,iter,XG_mid))
 //#endif
   {
     VectorXd          FUloc(n_dofs_u_per_cell);  // U subvector part of F
@@ -2219,8 +2219,8 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
         nod_id = is_in_id(tag_c,flusoli_tags);
         if (nod_id){
           for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
-            mapZ_c(j*3 + l) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
-                              + 3*nod_id - 2 + l;
+            mapZ_c(j*3 + l) = n_unknowns_u - 1
+                            + 3*nod_id - 2 + l;
           }
           SFI = true;  //cout << "Solid " << nod_id << " visited." << endl;
         }
@@ -2286,7 +2286,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       FZloc.setZero();
       FPloc.setZero();
       Eloc.setZero();
-
+      Z1loc.setZero(); Z2loc.setZero(); Z3loc.setZero(); Z4loc.setZero(); Z5loc.setZero();
 
       if (behaviors & BH_bble_condens_PnPn) // reset matrices
       {
@@ -3003,7 +3003,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
         MatSetValues(*JJ, mapP_c.size(), mapP_c.data(), mapZ_c.size(), mapZ_c.data(), Z5loc.data(), ADD_VALUES);
       }
       Assembly(Vec_fun_fs); Assembly(*JJ);
-      View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
+      //View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
     }  //end for cell
 
 
@@ -3022,8 +3022,8 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     for (int K = 0; K < N_Solids; K++){
       Grav = gravity(XG_mid[K]);
       for (int C = 0; C < 3; C++){
-        mapZ_s(C) = dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() - 1
-                                                     + 3*(K+1) - 2 + C;
+        mapZ_s(C) = n_unknowns_u - 1
+                  + 3*(K+1) - 2 + C;
       }  //cout << mapZ_s << endl;
       VecGetValues(Vec_uzp_0,    mapZ_s.size(), mapZ_s.data(), z_coefs_old.data());  //cout << z_coefs_old.transpose() << endl;
       VecGetValues(Vec_uzp_k ,   mapZ_s.size(), mapZ_s.data(), z_coefs_new.data());  //cout << z_coefs_new.transpose() << endl;
@@ -3042,7 +3042,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       MatSetValues(*JJ, mapZ_s.size(), mapZ_s.data(), mapZ_s.size(), mapZ_s.data(), Z3sloc.data(), ADD_VALUES);
     }
     Assembly(Vec_fun_fs); Assembly(*JJ);
-    View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
+    //View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
   }
 
 #if (false)
@@ -3616,7 +3616,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
   }
 
   Assembly(Vec_fun_fs); Assembly(*JJ);
-  View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
+  //View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
   if(print_to_matlab)
   {
     static bool ja_foi=false;
@@ -3629,6 +3629,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
 
   }
   //MatZeroEntries(*JJ); SNESGetJacobian(snes_fs, JJ, NULL, NULL, NULL); Assembly(*JJ);
+  //double val; VecNorm(Vec_fun_fs,NORM_2,&val); cout << "norma residuo " << val <<endl;
   PetscFunctionReturn(0);
 
 } // END formFunction
