@@ -1966,9 +1966,9 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       utheta = 0.5;
   }
 
-  XG_mid = midGP(XG, XG_0, utheta, N_Solids);
+  VecSetOption(Vec_uzp_k, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
 
-  bool const compact_bubble = false; // eliminate bubble from convective term
+//  bool const compact_bubble = false; // eliminate bubble from convective term
 
   int null_space_press_dof=-1;
 
@@ -2025,7 +2025,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
 
   // LOOP NAS CÉLULAS Parallel (uncomment it)
 //#ifdef FEP_HAS_OPENMP
-//  FEP_PRAGMA_OMP(parallel default(none) shared(Vec_uzp_k,Vec_fun_fs,cout,null_space_press_dof,JJ,utheta,iter,XG_mid))
+//  FEP_PRAGMA_OMP(parallel default(none) shared(Vec_uzp_k,Vec_fun_fs,cout,null_space_press_dof,JJ,utheta,iter))
 //#endif
   {
     VectorXd          FUloc(n_dofs_u_per_cell);  // U subvector part of F
@@ -2107,21 +2107,21 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     Vector              Uconv_qp(dim);
     Vector              dUdt(dim);
     double              Pqp_new;
-    double              Pqp;
-    double              bble_integ=0;
+//    double              Pqp;
+//    double              bble_integ=0;
     //VectorXd          FUloc(n_dofs_u_per_cell); // subvetor da função f (parte de U)
     //VectorXd          FPloc(n_dofs_p_per_cell);     // subvetor da função f (parte de P)
     VectorXi            cell_nodes(nodes_per_cell);
     double              J_mid;
     double              J_new, J_old;
     double              JxW_mid;
-    double              JxW_new, JxW_old;
+//    double              JxW_new, JxW_old;
     double              weight;
     double              visc=-1; // viscosity
     double              cell_volume;
     double              hk2;
     double              tauk=0;
-    double              delk=0;
+//    double              delk=0;
     double              delta_cd;
     double              rho;
     double ddt_factor;
@@ -2183,9 +2183,10 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     std::vector<bool>   SV(N_Solids,false);     //solid visited history
     std::vector<int>    SV_c(nodes_per_cell,0); //maximum nodes in solid visited saving the solid tag
     bool                SFI;                    //solid-fluid interception
+    XG_mid = midGP(XG, XG_0, utheta, N_Solids);
 
     Vector   RotfI(dim), RotfJ(dim), ConfI(dim), ConfJ(dim);
-    Vector   Zw(3); Zw << 0,0,1;
+    Vector   Zw(3); Zw << 0.0,0.0,1.0;
     Vector   XIg(dim), XJg(dim), Xg(dim), Xp(dim);
     Vector2d XIp, XIp_new, XIp_old, XJp, XJp_new, XJp_old;
     Tensor   TenfI(dim,dim), TenfJ(dim,dim);
@@ -2235,8 +2236,6 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       z_coefs_c_auo = MatrixXd::Zero(dim,nodes_per_cell);
       z_coefs_c_aun = MatrixXd::Zero(dim,nodes_per_cell);
       uz_coefs_c    = MatrixXd::Zero(dim,n_dofs_u_per_cell/dim);
-      VecSetOption(Vec_uzp_0, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
-      VecSetOption(Vec_uzp_k, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
 
       if ((is_bdf2 && time_step > 0) || (is_bdf3 && time_step > 1))
         VecGetValues(Vec_v_1, mapM_c.size(), mapM_c.data(), v_coefs_c_mid.data());
@@ -2315,7 +2314,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
         if (dim==3)
           tauk *= 0.1;
 
-        delk = 4.*visc + 2.*rho*uconv*sqrt(hk2);
+ //       delk = 4.*visc + 2.*rho*uconv*sqrt(hk2);
         //delk = 0;
 
         Eloc.setZero();
@@ -2323,7 +2322,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       }
       if (behaviors & BH_bble_condens_CR)
       {
-        bble_integ = 0;
+//        bble_integ = 0;
         Gnx.setZero();
         iBbb.setZero();
         Bnb.setZero();
@@ -2375,7 +2374,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
         Uqp_new  = u_coefs_c_new_trans * phi_c[qp]; //n+1
         Uqp_old  = u_coefs_c_old_trans * phi_c[qp]; //n
         Pqp_new  = p_coefs_c_new.dot(psi_c[qp]);
-        Pqp      = p_coefs_c_mid.dot(psi_c[qp]);
+//        Pqp      = p_coefs_c_mid.dot(psi_c[qp]);
         Vqp      = v_coefs_c_mid_trans * qsi_c[qp];
         dUdt     = (Uqp_new-Uqp_old)/dt;
         Uconv_qp = Uqp - Vqp;  //Uconv_qp = Uqp_old;
@@ -2428,8 +2427,8 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
 
         weight = quadr_cell->weight(qp);
         JxW_mid = J_mid*weight;
-        JxW_old = J_old*weight;
-        JxW_new = J_new*weight;
+//        JxW_old = J_old*weight;
+//        JxW_new = J_new*weight;
 
         if (J_mid < 1.e-14)
         {
@@ -3011,7 +3010,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
 
   //LOOP FOR SOLID-ONLY CONTRIBUTION
   {
-    VectorXd   FZsloc(3);
+    VectorXd   FZsloc = VectorXd::Zero(3);
     VectorXi   mapZ_s(3);
     VectorXd   z_coefs_old(3);
     VectorXd   z_coefs_new(3);
@@ -3030,7 +3029,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       dZdt = (z_coefs_new - z_coefs_old)/dt;
       for (int C = 0; C < 3; C++){
         if (C < 2){
-          FZsloc(C) = MV[K]*dZdt(C) - MV[K]*Grav(C) +8;
+          FZsloc(C) = MV[K]*dZdt(C) - MV[K]*Grav(C);
           Z3sloc(C,C) = MV[K]/dt;
         }
         else{

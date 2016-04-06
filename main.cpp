@@ -790,7 +790,7 @@ PetscErrorCode AppCtx::allocPetscObjs()
 
   PetscErrorCode      ierr;
 //  ierr = SNESCreate(PETSC_COMM_WORLD, &snes);                   CHKERRQ(ierr);
-
+  PetscViewerSetFormat(PETSC_VIEWER_STDOUT_WORLD,PETSC_VIEWER_ASCII_INDEX);
   //Vec Vec_res;
 //  ierr = VecCreate(PETSC_COMM_WORLD, &Vec_res);                     CHKERRQ(ierr);  //creating Vec_res empty PETSc vector
 //  ierr = VecSetSizes(Vec_res, PETSC_DECIDE, n_unknowns);            CHKERRQ(ierr);
@@ -810,7 +810,7 @@ PetscErrorCode AppCtx::allocPetscObjs()
   ierr = VecCreate(PETSC_COMM_WORLD, &Vec_uzp_0);                      CHKERRQ(ierr);
   ierr = VecSetSizes(Vec_uzp_0, PETSC_DECIDE, n_unknowns_fs);          CHKERRQ(ierr);
   ierr = VecSetFromOptions(Vec_uzp_0);                                 CHKERRQ(ierr);
-
+  ierr = VecSetOption(Vec_uzp_0, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);  CHKERRQ(ierr);
   //Vec Vec_up_1;
 //  ierr = VecCreate(PETSC_COMM_WORLD, &Vec_up_1);                       CHKERRQ(ierr);
 //  ierr = VecSetSizes(Vec_up_1, PETSC_DECIDE, n_unknowns);              CHKERRQ(ierr);
@@ -820,7 +820,7 @@ PetscErrorCode AppCtx::allocPetscObjs()
   ierr = VecCreate(PETSC_COMM_WORLD, &Vec_uzp_1);                       CHKERRQ(ierr);
   ierr = VecSetSizes(Vec_uzp_1, PETSC_DECIDE, n_unknowns_fs);           CHKERRQ(ierr);
   ierr = VecSetFromOptions(Vec_uzp_1);                                  CHKERRQ(ierr);
-
+  ierr = VecSetOption(Vec_uzp_1, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);  CHKERRQ(ierr);
   //Vec Vec_dup;
 //  ierr = VecCreate(PETSC_COMM_WORLD, &Vec_dup);                       CHKERRQ(ierr);
 //  ierr = VecSetSizes(Vec_dup, PETSC_DECIDE, n_unknowns);              CHKERRQ(ierr);
@@ -830,6 +830,7 @@ PetscErrorCode AppCtx::allocPetscObjs()
   ierr = VecCreate(PETSC_COMM_WORLD, &Vec_duzp);                       CHKERRQ(ierr);
   ierr = VecSetSizes(Vec_duzp, PETSC_DECIDE, n_unknowns_fs);           CHKERRQ(ierr);
   ierr = VecSetFromOptions(Vec_duzp);                                  CHKERRQ(ierr);
+  ierr = VecSetOption(Vec_duzp, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);  CHKERRQ(ierr);
 
   if (is_bdf3)
   {
@@ -881,7 +882,6 @@ PetscErrorCode AppCtx::allocPetscObjs()
   ierr = VecCreate(PETSC_COMM_WORLD, &Vec_res_m);                     CHKERRQ(ierr);
   ierr = VecSetSizes(Vec_res_m, PETSC_DECIDE, n_dofs_v_mesh);         CHKERRQ(ierr);
   ierr = VecSetFromOptions(Vec_res_m);                                CHKERRQ(ierr);
-
 
   std::vector<int> nnz;
 #if (false)
@@ -1007,7 +1007,7 @@ PetscErrorCode AppCtx::allocPetscObjs()
   {
     ierr = SNESSetType(snes_m, SNESKSPONLY); CHKERRQ(ierr);
   }
-  //ierr = SNESSetFromOptions(snes_m); CHKERRQ(ierr);  //prints newton iterations information SNES Function norm
+  ierr = SNESSetFromOptions(snes_m); CHKERRQ(ierr);  //prints newton iterations information SNES Function norm
 
 //~ #ifdef PETSC_HAVE_MUMPS
   //~ PCFactorSetMatSolverPackage(pc_m,MATSOLVERMUMPS);
@@ -1580,8 +1580,7 @@ PetscErrorCode AppCtx::setInitialConditions()
       if (!SV[nod_id-1]){
         //getNodeDofs(&*point,DH_UNKM,VAR_Z,dofs_fs.data());
         for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
-          dofs_fs(l) = n_unknowns_u - 1
-      		    	   + 3*nod_id - 2 + l;
+          dofs_fs(l) = n_unknowns_u - 1 + 3*nod_id - 2 + l;
         }
         SV[nod_id-1] = true;
       }
@@ -1606,8 +1605,8 @@ PetscErrorCode AppCtx::setInitialConditions()
   //if (false) calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.0, Vec_v_mid, 0.0);  //borrar!
   calcMeshVelocity(Vec_x_0, Vec_uzp_0, Vec_uzp_1, 1.0, Vec_v_mid, 0.0); // Vec_up_0 = Vec_up_1, vtheta = 1.0, mean b.c. = Vec_up_1 = Vec_v_mid init. guess SNESSolve
   // move the mesh
-  VecWAXPY(Vec_x_1, dt, Vec_v_mid, Vec_x_0); // Vec_x_1 = Vec_v_mid*dt + Vec_x_0 // for zero Dir. cond. solution lin. elast. is Vec_v_mid = 0
-  //VecView(Vec_v_mid,PETSC_VIEWER_STDOUT_WORLD); VecView(Vec_x_0,PETSC_VIEWER_STDOUT_WORLD); VecView(Vec_x_1,PETSC_VIEWER_STDOUT_WORLD);
+  VecWAXPY(Vec_x_1, dt, Vec_v_mid, Vec_x_0); // Vec_x_1 = dt*Vec_v_mid + Vec_x_0 // for zero Dir. cond. solution lin. elast. is Vec_v_mid = 0
+  //VecView(Vec_v_mid,PETSC_VIEWER_STDOUT_WORLD); //VecView(Vec_x_0,PETSC_VIEWER_STDOUT_WORLD); VecView(Vec_x_1,PETSC_VIEWER_STDOUT_WORLD);
   //point = mesh->pointBegin();
   //point_end = mesh->pointEnd();
   //for (; point != point_end; ++point)
@@ -1615,7 +1614,7 @@ PetscErrorCode AppCtx::setInitialConditions()
   ////point->getCoord(X.data());
   ////cout << "HAAAA : " << X.transpose() << endl;
   //} // end point loop
-  XG_0 = XG;
+  XG_0 = XG;  //mass centers with initial mesh
   if (ale)
   {
 
