@@ -846,9 +846,9 @@ PetscErrorCode AppCtx::allocPetscObjs()
   ierr = VecSetFromOptions(Vec_v_mid);                             CHKERRQ(ierr);
 
   //Vec Vec_v_mid_fs
-  ierr = VecCreate(PETSC_COMM_WORLD, &Vec_v_mid_fs);                  CHKERRQ(ierr);
-  ierr = VecSetSizes(Vec_v_mid_fs, PETSC_DECIDE, n_dofs_v_mesh);      CHKERRQ(ierr);
-  ierr = VecSetFromOptions(Vec_v_mid_fs);                             CHKERRQ(ierr);
+//  ierr = VecCreate(PETSC_COMM_WORLD, &Vec_v_mid_fs);                  CHKERRQ(ierr);
+//  ierr = VecSetSizes(Vec_v_mid_fs, PETSC_DECIDE, n_dofs_v_mesh);      CHKERRQ(ierr);
+//  ierr = VecSetFromOptions(Vec_v_mid_fs);                             CHKERRQ(ierr);
 
   //Vec Vec_v_1
   ierr = VecCreate(PETSC_COMM_WORLD, &Vec_v_1);                  CHKERRQ(ierr);
@@ -1537,9 +1537,9 @@ PetscErrorCode AppCtx::setInitialConditions()
 
       mesh->getNodePtr(edge_nodes[0])->getCoord(Xa.data(),dim);  //coords node1 of current edge
       mesh->getNodePtr(edge_nodes[1])->getCoord(Xb.data(),dim);  //coords node2 of current edge
-      h = (Xa-Xb).norm();  // current edge length //cout << h << endl; cout << edge_nodes << endl;
+      h = (Xa-Xb).norm();  //cout << h << "     " << edge_nodes.transpose() << "     ";
 
-      mesh_sizes[edge_nodes[0]] = (mesh_sizes[edge_nodes[0]]*counter[edge_nodes[0]] + h)/(counter[edge_nodes[0]] + 1.0);  //cout << mesh_sizes[edge_nodes[0]] << endl;
+      mesh_sizes[edge_nodes[0]] = (mesh_sizes[edge_nodes[0]]*counter[edge_nodes[0]] + h)/(counter[edge_nodes[0]] + 1.0);  //cout << mesh_sizes[edge_nodes[0]] << "  ";
       mesh_sizes[edge_nodes[1]] = (mesh_sizes[edge_nodes[1]]*counter[edge_nodes[1]] + h)/(counter[edge_nodes[1]] + 1.0);  //cout << mesh_sizes[edge_nodes[1]] << endl;
 
       ++counter[edge_nodes[0]];

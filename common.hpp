@@ -624,7 +624,7 @@ public:
   int                    N_Solids;
   std::vector<int>       NN_Solids;
   std::vector<double>    MV, RV;  //mass vector, radius vector
-  std::vector<Vector2d>  XG, XG_0, XG_mid;
+  std::vector<Vector2d>  XG, XG_0;//, XG_mid;
   //bool                   casevar = true, casevarc = true; //case variable or const to H solid vel functional
 
   // mesh alias

@@ -1,9 +1,9 @@
 -dim 2
 -dt 0.01
--finaltime 10
+-finaltime 100
 -maxts -40
 -renumber_dofs 0
--print_step 10
+-print_step 1
 -has_convec 1
 -unsteady   1
 -boundary_smoothing 0
@@ -106,9 +106,9 @@ mesh_type 4096
 fin results/canal/canal_ord1.msh
 fout results/canal/canal.vtk
 
--fin results/sol_asc/2d/solid_micro_0.msh
--fout results/sol_asc/2d/solid_micro_.vtk
--min results/sol_asc/2d/solid_micro.txt
+-fin results/sol_asc/2d/solid_micro_3.msh
+-fout results/sol_asc/2d/out_MAd/solid_micro_.vtk
+-min results/sol_asc/2d/solid_micro_34.txt
 
 fin results/sol_asc/2d/tube_Nb_solid.msh
 fout results/sol_asc/2d/solid_Nb_solid_.vtk

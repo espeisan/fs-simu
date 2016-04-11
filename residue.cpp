@@ -1967,13 +1967,13 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
   }
 
   VecSetOption(Vec_uzp_k, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
-
+  std::vector<Vector2d> XG_mid = midGP(XG, XG_0, utheta, N_Solids);
+  //std::vector<Vector2d> XG_mid = AppCtx::XG_mid;
 //  bool const compact_bubble = false; // eliminate bubble from convective term
 
   int null_space_press_dof=-1;
 
   int iter;
-
   SNESGetIterationNumber(snes_fs,&iter);  //cout << iter <<endl;
 
   if (!iter)
@@ -2025,7 +2025,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
 
   // LOOP NAS CÉLULAS Parallel (uncomment it)
 //#ifdef FEP_HAS_OPENMP
-//  FEP_PRAGMA_OMP(parallel default(none) shared(Vec_uzp_k,Vec_fun_fs,cout,null_space_press_dof,JJ,utheta,iter))
+//  FEP_PRAGMA_OMP(parallel default(none) shared(Vec_uzp_k,Vec_fun_fs,cout,null_space_press_dof,JJ,utheta,iter,XG_mid))
 //#endif
   {
     VectorXd          FUloc(n_dofs_u_per_cell);  // U subvector part of F
@@ -2040,6 +2040,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     MatrixXd            u_coefs_c_new(n_dofs_u_per_cell/dim, dim);        // n+1
     MatrixXd            u_coefs_c_new_trans(dim,n_dofs_u_per_cell/dim);   // n+1
     MatrixXd            uz_coefs_c(dim, n_dofs_u_per_cell/dim);
+    MatrixXd            uz_coefs_c_old(dim, n_dofs_u_per_cell/dim);
 
     MatrixXd            du_coefs_c_old(n_dofs_u_per_cell/dim, dim);        // n
     MatrixXd            du_coefs_c_old_trans(dim,n_dofs_u_per_cell/dim);   // n
@@ -2121,7 +2122,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     double              cell_volume;
     double              hk2;
     double              tauk=0;
-//    double              delk=0;
+    double              delk=0;
     double              delta_cd;
     double              rho;
     double ddt_factor;
@@ -2183,7 +2184,6 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     std::vector<bool>   SV(N_Solids,false);     //solid visited history
     std::vector<int>    SV_c(nodes_per_cell,0); //maximum nodes in solid visited saving the solid tag
     bool                SFI;                    //solid-fluid interception
-    XG_mid = midGP(XG, XG_0, utheta, N_Solids);
 
     Vector   RotfI(dim), RotfJ(dim), ConfI(dim), ConfJ(dim);
     Vector   Zw(3); Zw << 0.0,0.0,1.0;
@@ -2236,6 +2236,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       z_coefs_c_auo = MatrixXd::Zero(dim,nodes_per_cell);
       z_coefs_c_aun = MatrixXd::Zero(dim,nodes_per_cell);
       uz_coefs_c    = MatrixXd::Zero(dim,n_dofs_u_per_cell/dim);
+      uz_coefs_c_old= MatrixXd::Zero(dim,n_dofs_u_per_cell/dim);
 
       if ((is_bdf2 && time_step > 0) || (is_bdf3 && time_step > 1))
         VecGetValues(Vec_v_1, mapM_c.size(), mapM_c.data(), v_coefs_c_mid.data());
@@ -2307,15 +2308,24 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
         }  //cout << J_mid << " " << cell_volume << endl;
 
         hk2 = cell_volume / pi; // element size
-        double const uconv = (u_coefs_c_old - v_coefs_c_mid).lpNorm<Infinity>();
+
+        if (SFI){
+          for (int J = 0; J < nodes_per_cell; J++){
+            if (SV_c[J]){
+              XJp_old = x_coefs_c_old_trans.col(J);
+              uz_coefs_c_old.col(J) = SolidVel(XJp_old,XG_0[SV_c[J]-1],z_coefs_c_old_trans.col(J));
+            }
+          }
+        }
+        double const uconv = (u_coefs_c_old - v_coefs_c_mid + uz_coefs_c_old.transpose()).lpNorm<Infinity>();
 
         tauk = 4.*visc/hk2 + 2.*rho*uconv/sqrt(hk2);
         tauk = 1./tauk;
         if (dim==3)
           tauk *= 0.1;
 
- //       delk = 4.*visc + 2.*rho*uconv*sqrt(hk2);
-        //delk = 0;
+        //delk = 4.*visc + 2.*rho*uconv*sqrt(hk2);
+        delk = 0;
 
         Eloc.setZero();
         Cloc.setZero();
@@ -2473,7 +2483,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
             for (int j = 0; j < n_dofs_p_per_cell; ++j)
             {
               Gloc(i*dim + c,j) -= JxW_mid * psi_c[qp][j]* dxphi_c(i,c);
-              Dloc(j, i*dim + c) -= utheta*JxW_mid * psi_c[qp][j]*  dxphi_c(i,c);
+              Dloc(j,i*dim + c) -= utheta*JxW_mid * psi_c[qp][j]*  dxphi_c(i,c);
             }
 
           }
@@ -2769,6 +2779,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
           }
         }
         else
+#endif
         if(behaviors & BH_GLS)
         {
           Res = rho*( dUdt * unsteady + has_convec*dxU*Uconv_qp) + dxP_new - force_at_mid;
@@ -2779,9 +2790,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
 
             for (int i = 0; i < n_dofs_p_per_cell; ++i)
             {
-              vec = dxpsi_c.row(i).transpose();
-              vec = dResdu.transpose()*vec;
-              vec = -JxW_mid*tauk* vec;
+              vec = -JxW_mid*tauk* dResdu.transpose()*dxpsi_c.row(i).transpose();  //why minus in front of JxW_mid?
               for (int d = 0; d < dim; d++)
                 Dloc(i, j*dim + d) += vec(d);
 
@@ -2806,7 +2815,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
 
           for (int i = 0; i < n_dofs_p_per_cell; ++i)
             for (int j = 0; j < n_dofs_p_per_cell; ++j)
-              Eloc(i,j) -= tauk*JxW_mid * dxphi_c.row(i).dot(dxphi_c.row(j));
+              Eloc(i,j) -= tauk*JxW_mid * dxpsi_c.row(i).dot(dxpsi_c.row(j));  //minus?
 
 
           for (int i = 0; i < n_dofs_u_per_cell/dim; i++)
@@ -2818,10 +2827,53 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
 
           }
           for (int i = 0; i < n_dofs_p_per_cell; ++i)
-            FPloc(i) -= JxW_mid *tauk* dxpsi_c.row(i).dot(Res);
+            FPloc(i) -= JxW_mid *tauk* dxpsi_c.row(i).dot(Res);  //minus?
             //FPloc(i) -= JxW_mid *tauk* dxpsi_c.row(i).dot(dxP_new - force_at_mid); // somente laplaciano da pressao
-        }
+#if (false)
+          if (SFI){
+            // residue
+            for (int I = 0; I < nodes_per_cell; I++){
+              int K = SV_c[I];
+              if (K != 0){
+                vec = JxW_mid*( has_convec*tauk* rho* Uconv_qp.dot(dxphi_c.row(I)) * Res + delk*dxU.trace()*dxphi_c.row(I).transpose() );
+                for (int C = 0; C < 3; C++){
+                  if (C < 2){
+                    FZloc(I*3 + C) += vec(C);
+                  }
+                  else{
+                    XIp   = x_coefs_c_mid_trans.col(I); //ref point Xp, old, mid, or new
+                    XIg   = XG_mid[K-1];                //mass center, mid, _0, "new"
+                    RotfI = SolidVel(XIp,XIg,Zw);       //fixed evaluation point Xp, old, mid or new
+                    //ConfI = dxU * Uconv_qp;
+                    TenfI = RotfI * dxphi_c.row(I);
 
+                    FZloc(I*3 + C) += JxW_mid*tauk*rho*Res.dot(TenfI*Uconv_qp);
+                  }
+                }
+              }
+            } //end for I
+
+            //jacobian Z1
+            for (int J = 0; J < nodes_per_cell; J++){
+              int L = SV_c[J];
+              if (L != 0){
+                for (int i = 0; i < n_dofs_u_per_cell/dim; i++){
+                  Ten = JxW_mid*tauk* has_convec*( utheta*rho*phi_c[qp][j]*Res*dxphi_c.row(i) + rho*Uconv_qp.dot(dxphi_c.row(i))*dResdu );
+                  for (int c = 0; c < dim; c++){
+                    for (int D = 0; D < 3; D++){
+                      if (D < 2){
+                        Z1loc(i*dim+c,J*3+D) += Ten(c,D);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+          } //end SFI
+#endif
+        } //end if(behaviors & BH_GLS)
+#if (false)
         if (behaviors & BH_bble_condens_CR)
         {
           bble_integ += JxW_mid*bble[qp];
@@ -2835,7 +2887,6 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
             FPx(c) -= JxW_mid* dxU.trace()*(Xqp(c) - Xc(c));
           }
         }
-
 #endif
       } // fim quadratura
 #if(false)
