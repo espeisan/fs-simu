@@ -1925,7 +1925,7 @@ PetscErrorCode AppCtx::formFunction_mesh(SNES /*snes_m*/, Vec Vec_v, Vec Vec_fun
       nodeid = mesh->getPointId(&*point);
       getProjectorBC(A, 1, &nodeid, Vec_x_0, current_time, *this);
       A = I - A;
-      MatSetValues(*JJ, dim, v_dofs, dim, v_dofs, A.data(), ADD_VALUES);
+      MatSetValues(*JJ, dim, v_dofs, dim, v_dofs, A.data(), INSERT_VALUES);//ADD_VALUES);
     }
   }
 

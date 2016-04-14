@@ -1007,7 +1007,7 @@ PetscErrorCode AppCtx::allocPetscObjs()
   {
     ierr = SNESSetType(snes_m, SNESKSPONLY); CHKERRQ(ierr);
   }
-  ierr = SNESSetFromOptions(snes_m); CHKERRQ(ierr);  //prints newton iterations information SNES Function norm
+//  ierr = SNESSetFromOptions(snes_m); CHKERRQ(ierr);  //prints newton iterations information SNES Function norm
 
 //~ #ifdef PETSC_HAVE_MUMPS
   //~ PCFactorSetMatSolverPackage(pc_m,MATSOLVERMUMPS);
@@ -1874,7 +1874,7 @@ PetscErrorCode AppCtx::solveTimeProblem()
   setInitialConditions();  //called only here
   int its;
 
-  printf("Num. of time iterations (maxts): %d\n",maxts);
+  printf("\nNum. of time iterations (maxts): %d\n",maxts);
   printf("Starting time loop ... \n");
 
   // BDF2

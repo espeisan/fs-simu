@@ -1362,7 +1362,7 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
               node_dofs_solid_fs(l) = n_unknowns_u - 1
           			                + 3*nod_id - 2 + l;
             }
-//          }
+            //cout << node_dofs_solid_fs.transpose() << endl;
         }
         else{
           getNodeDofs(&*point, DH_UNKM, VAR_U, node_dofs_fluid_fs.data());
@@ -1438,6 +1438,7 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
                 Xg = getAreaMassCenterSolid(nod_id);
                 XG[nod_id-1] = Xg;  SV[nod_id-1] = true;
               }
+                Xg = XG[nod_id-1];
                 VecGetValues(Vec_up_0,  3, node_dofs_solid_fs.data(), U0_fs.data());
                 VecGetValues(Vec_up_1,  3, node_dofs_solid_fs.data(), U1_fs.data());
                 tmp_fs = vtheta*U1_fs + (1.-vtheta)*U0_fs;
