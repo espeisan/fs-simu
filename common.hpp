@@ -23,7 +23,7 @@ using namespace tr1;
 enum VarNumber {
   // DH_UNKS
   VAR_U = 0,
-  VAR_P = 1,
+  //VAR_P = 1,
 
   // DH_UNKM  Unknowns modified
   //VAR_U     //variable fluid only
@@ -35,9 +35,9 @@ enum VarNumber {
 };
 
 enum DofHandlerNumber {
-  DH_UNKS = 0,
+  DH_UNKM = 0,
   DH_MESH = 1,
-  DH_UNKM = 2
+  //DH_UNKS = 2
 };
 
 enum PairSpace {
@@ -518,7 +518,7 @@ public:
   std::vector<int> flusoli_tags;  //fluid solid interface
   std::vector<int> fluidonly_tags;  //fluid only
 
-  DofHandler                   dof_handler[3];
+  DofHandler                   dof_handler[2];  //or 3
   MeshIoMsh                    msh_reader;
   MeshIoVtk                    vtk_printer;
   shared_ptr<Mesh>             mesh;
@@ -653,12 +653,12 @@ public:
   std::vector<Real>    mesh_sizes;
 
   // petsc vectors
-  Vec                 Vec_res, Vec_up_0, Vec_up_1,Vec_dup, Vec_normal/**/, Vec_uzp_0, Vec_uzp_1, Vec_duzp, Vec_res_fs;
+  Vec                 Vec_uzp_0, Vec_uzp_1, Vec_duzp, Vec_res_fs, Vec_normal;//, Vec_res, Vec_up_0, Vec_up_1,Vec_dup, /**/;
   Vec                 Vec_dup_0; // for bdf3
-  Mat                 Mat_Jac, Mat_Jac_fs;
-  SNES                snes, snes_fs;         /* nonlinear solver context */
-  KSP    			        ksp, ksp_fs;
-  PC	   			        pc, pc_fs;
+  Mat                 Mat_Jac_fs;//, Mat_Jac;
+  SNES                snes_fs;//, snes;         /* nonlinear solver context */
+  KSP    			        ksp_fs;//ksp,
+  PC	   			        pc_fs;//pc,
 
   // mesh
   Mat                 Mat_Jac_m;

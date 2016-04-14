@@ -966,8 +966,8 @@ PetscErrorCode AppCtx::allocPetscObjs()
 
     //FEP_PRAGMA_OMP(parallel for)
     for (int i = 0; i < n_mesh_dofs; ++i)
-      nnz[i] = table[i].size();
-
+      {nnz[i] = table[i].size();}  //cout << nnz[i] << " ";}
+//cout << endl;
   }
 
 
@@ -1022,10 +1022,10 @@ PetscErrorCode AppCtx::allocPetscObjs()
 
 //  nnz.clear();
 //  {
-//    nnz.resize(n_unknowns_fs,0);
+//    nnz.resize(dof_handler[DH_UNKM].numDofs(),0);
 //    std::vector<SetVector<int> > tabla;
 //    dof_handler[DH_UNKM].getSparsityTable(tabla); // TODO: melhorar desempenho, função mt lenta
-      //FEP_PRAGMA_OMP(parallel for)
+//    //FEP_PRAGMA_OMP(parallel for)
 //      for (int i = 0; i < n_unknowns_fs; ++i)
 //        nnz[i] = tabla[i].size();
 //  }
@@ -1124,7 +1124,7 @@ void AppCtx::matrixColoring()
   bool                SFI;                 //solid-fluid interception
   cell_iterator cell = mesh->cellBegin();
   cell_iterator cell_end = mesh->cellEnd();
-
+  //int G = 0;
   for (; cell != cell_end; ++cell){
     // mapeamento do local para o global:
     dof_handler[DH_UNKM].getVariable(VAR_U).getCellDofs(mapF_c.data(), &*cell);  // U global ids for the current cell
@@ -1137,7 +1137,7 @@ void AppCtx::matrixColoring()
     MatSetValues(Mat_Jac_fs, mapQ_c.size(), mapQ_c.data(), mapQ_c.size(), mapQ_c.data(), Efsloc.data(), ADD_VALUES);
 
     dof_handler[DH_UNKM].getVariable(VAR_Z).getCellDofs(mapZ_c.data(), &*cell);  // Z global ids for the current cell
-
+    //cout << G << " "; G++;
     SFI = false;
     for (int j = 0; j < nodes_per_cell; ++j){
       tag = mesh->getNodePtr(cell->getNodeId(j))->getTag();
@@ -1160,7 +1160,7 @@ void AppCtx::matrixColoring()
     }
   }//end for cell
 
-  Assembly(Mat_Jac_fs); //View(Mat_Jac_fs,"MatColored","JJ");
+  Assembly(Mat_Jac_fs); //View(Mat_Jac_fs,"MatColored.m","JJ");
 //}
   printf(" done. \n");
 }
@@ -1173,8 +1173,8 @@ void AppCtx::printMatlabLoader()
   fprintf(fp, "clear zzz;\n"               );
   fprintf(fp, "B=Jac;\n"                   );
   fprintf(fp, "B(B!=0)=1;\n"               );
-  fprintf(fp, "nU = %d;\n",dof_handler[DH_UNKS].getVariable(VAR_U).numPositiveDofs() );
-  fprintf(fp, "nP = %d;\n",dof_handler[DH_UNKS].getVariable(VAR_P).numPositiveDofs() );
+  fprintf(fp, "nU = %d;\n",dof_handler[DH_UNKM].getVariable(VAR_U).numPositiveDofs() );
+  fprintf(fp, "nP = %d;\n",dof_handler[DH_UNKM].getVariable(VAR_Q).numPositiveDofs() );
   fprintf(fp, "nT = nU + nP;\n"            );
   fprintf(fp, "K=Jac(1:nU,1:nU);\n"        );
   fprintf(fp, "G=Jac(1:nU,nU+1:nT);\n"     );
@@ -1596,7 +1596,7 @@ PetscErrorCode AppCtx::setInitialConditions()
 //PetscInt size1;
 //  Assembly(Vec_up_0);  //VecView(Vec_up_0,PETSC_VIEWER_STDOUT_WORLD);  //vel_unk + pres_unk //VecGetSize(Vec_up_0,&size1);
 //  VecCopy(Vec_up_0,Vec_up_1);  //borrar!
-  Assembly(Vec_uzp_0);  //VecView(Vec_uzp_0,PETSC_VIEWER_STDOUT_WORLD);  //u_unk+z_unk+p_unk //VecGetSize(Vec_up_0,&size1);
+  Assembly(Vec_uzp_0);  //View(Vec_uzp_0,"matrizes/vuzp.m","vuzpm");//VecView(Vec_uzp_0,PETSC_VIEWER_STDOUT_WORLD);  //u_unk+z_unk+p_unk //VecGetSize(Vec_up_0,&size1);
   VecCopy(Vec_uzp_0,Vec_uzp_1);
 
   // remember: Vec_normals follows the Vec_x_1
@@ -1621,7 +1621,7 @@ PetscErrorCode AppCtx::setInitialConditions()
     printf("Initial conditions:\n");
     for (int m=0; m<1+is_bdf3; ++m)
     {
-      setUPInitialGuess();
+      setUPInitialGuess();  //applies b.c. to Vec_uzp_1
 
       for (int i = 0; i < 10; ++i)  // predictor-corrector to initialize
       {
@@ -1664,7 +1664,7 @@ PetscErrorCode AppCtx::setInitialConditions()
             getVecNormals(&Vec_x_mid, Vec_normal);
 
             VecDestroy(&Vec_x_mid);
-            if (false) VecRestoreArray(Vec_res, &xarray);
+            //if (false) VecRestoreArray(Vec_res, &xarray);
             VecRestoreArray(Vec_res_fs, &xarray);
           }
 
@@ -1926,7 +1926,7 @@ PetscErrorCode AppCtx::solveTimeProblem()
       VecAXPY(Vec_x_1,1.0,Vec_x_0);
       VecScale(Vec_x_1, .5);
       // computa a velocidade nesse X meio
-      calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.5, Vec_v_1, current_time);
+      //calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.5, Vec_v_1, current_time);
       VecCopy(Vec_v_1, Vec_x_1);
       VecScale(Vec_x_1, dt);
       VecAXPY(Vec_x_1,1.,Vec_x_0);
@@ -1951,7 +1951,7 @@ PetscErrorCode AppCtx::solveTimeProblem()
 //    VecCopy(Vec_up_1, Vec_up_0);
     cout << "inside BDF2 main 1953" << endl;
   }//end if BDF2
-
+int TT = 0;
   for(;;)  // equivalent to forever or while(true), must be a break inside
   {
 
@@ -1983,13 +1983,24 @@ PetscErrorCode AppCtx::solveTimeProblem()
     if (solve_the_sys)
     {
       setUPInitialGuess();  //setup Vec_up_1 for SNESSolve
-
+      char gravc[23];
+      sprintf(gravc,"matrizes/gravc%d.txt",TT);
+      ofstream filg; filg.open(gravc);
+      Vector Xgg(dim);
+      for (int G = 0; G < N_Solids; G++){
+        Xgg = XG[G];
+        filg << Xgg(0) << " " << Xgg(1) << endl;
+      } filg.close();
+      char buf1[18], buf2[10];
+      sprintf(buf1,"matrizes/sol%d.m",TT); sprintf(buf2,"solm%d",TT);
+      View(Vec_uzp_0, buf1, buf2);
+      sprintf(buf1,"matrizes/mal%d.m",TT); sprintf(buf2,"malm%d",TT);
+      View(Vec_x_0, buf1, buf2);  TT++;
       for (int kk = 0 ; kk < 1+3*full_implicit; kk++)
       {
         printf("\tFixed Point Iteration %d\n", kk);
         //ierr = SNESSolve(snes,PETSC_NULL,Vec_up_1);        CHKERRQ(ierr);
         ierr = SNESSolve(snes_fs,PETSC_NULL,Vec_uzp_1);        CHKERRQ(ierr);
-
         // update
         if (full_implicit)
         {
@@ -2034,8 +2045,8 @@ PetscErrorCode AppCtx::solveTimeProblem()
     } // end if (solve_the_system)
     if (is_bdf2)
     {
-      if (false && plot_exact_sol)  //TODO: actualizar el false
-        {computeError(Vec_x_0, Vec_up_0,current_time);}
+      if (false && plot_exact_sol){cout << endl;}  //TODO: actualizar el false
+        //{computeError(Vec_x_0, Vec_up_0,current_time);}
 //      VecCopy(Vec_up_1, Vec_dup);
 //      VecAXPY(Vec_dup,-1.0,Vec_up_0); // Vec_dup -= Vec_up_0
 //      VecScale(Vec_dup, 1./dt);
@@ -2206,13 +2217,13 @@ PetscErrorCode AppCtx::solveTimeProblem()
         // copyMesh2Vec(Vec_x_0); // we need Vec_x_0 later, don't touch it
 
         // estraga Vec_up_0
-        VecCopy(Vec_dup, Vec_up_0);
-        VecScale(Vec_up_0, 2.0);
-        VecAXPY(Vec_up_0,-1.0,Vec_dup_0);
-        VecScale(Vec_up_0, dt);
-        VecAXPY(Vec_up_0, 1.0,Vec_up_1); // Vec_up_0 tem agora a extrapolacao do futuro Vec_up_1
+        //VecCopy(Vec_dup, Vec_up_0);
+        //VecScale(Vec_up_0, 2.0);
+        //VecAXPY(Vec_up_0,-1.0,Vec_dup_0);
+        //VecScale(Vec_up_0, dt);
+        //VecAXPY(Vec_up_0, 1.0,Vec_up_1); // Vec_up_0 tem agora a extrapolacao do futuro Vec_up_1
 
-        calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 0.0, Vec_v_1, current_time);
+        //calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 0.0, Vec_v_1, current_time);
         VecCopy(Vec_v_1, Vec_x_1);
         VecScale(Vec_x_1, 6./11.*dt);
         VecAXPY(Vec_x_1, 2./11.,Vec_x_aux);
@@ -2249,20 +2260,20 @@ PetscErrorCode AppCtx::solveTimeProblem()
             //VecCopy(Vec_v_1, Vec_v_mid);
             if (is_bdf_extrap_cte) // faz v1 <- 1.5 v1 - 0.5 v0
             {
-              calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.5, Vec_v_1, current_time);
+              //calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.5, Vec_v_1, current_time);
               VecCopy(Vec_v_1, Vec_x_1); // estraga x1, eh consertado depois
               VecAXPBY(Vec_v_1, -0.5, 1.5, Vec_v_mid);
               VecCopy(Vec_x_1, Vec_v_mid);
             }
             else
             {
-              calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.5, Vec_v_1, current_time);
+              //calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.5, Vec_v_1, current_time);
               VecCopy(Vec_v_1, Vec_v_mid);
             }
           }
           else if (is_bdf_bdf_extrap)
           {
-            calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 2.0, Vec_v_1, current_time);
+            //calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 2.0, Vec_v_1, current_time);
             VecCopy(Vec_v_1, Vec_x_1);
             VecScale(Vec_x_1, 2./3.);
             VecAXPY(Vec_x_1, 1./3.,Vec_v_mid);
@@ -2275,7 +2286,7 @@ PetscErrorCode AppCtx::solveTimeProblem()
             VecAXPY(Vec_x_1,1.0,Vec_x_0);
             VecScale(Vec_x_1, .5);
             // computa a velocidade nesse X meio
-            calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.5, Vec_v_1, current_time);
+            //calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 1.5, Vec_v_1, current_time);
             VecCopy(Vec_v_1, Vec_x_1);
             VecScale(Vec_x_1, dt);
             VecAXPY(Vec_x_1,1.,Vec_x_0);
@@ -2287,7 +2298,7 @@ PetscErrorCode AppCtx::solveTimeProblem()
           else
           {
             VecCopy(Vec_v_1, Vec_v_mid);
-            calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 2.0, Vec_v_1, current_time);
+            //calcMeshVelocity(Vec_x_0, Vec_up_0, Vec_up_1, 2.0, Vec_v_1, current_time);
             VecAXPBY(Vec_v_mid, .5, .5, Vec_v_1); //  y = alpha x + beta y.
           }
         }
@@ -2517,8 +2528,8 @@ void AppCtx::computeError(Vec const& Vec_x, Vec &Vec_up, double tt)
 
     // mapeamento do local para o global:
     //
-    dof_handler[DH_UNKS].getVariable(VAR_U).getCellDofs(mapU_c.data(), &*cell);
-    dof_handler[DH_UNKS].getVariable(VAR_P).getCellDofs(mapP_c.data(), &*cell);
+    dof_handler[DH_UNKM].getVariable(VAR_U).getCellDofs(mapU_c.data(), &*cell);
+    dof_handler[DH_UNKM].getVariable(VAR_Q).getCellDofs(mapP_c.data(), &*cell);
     dof_handler[DH_MESH].getVariable(VAR_M).getCellDofs(mapM_c.data(), &*cell);
 
     /*  Pega os valores das variáveis nos graus de liberdade */
@@ -2579,7 +2590,7 @@ void AppCtx::computeError(Vec const& Vec_x, Vec &Vec_up, double tt)
 
     // mapeamento do local para o global:
     //
-    dof_handler[DH_UNKS].getVariable(VAR_U).getFacetDofs(mapU_f.data(), &*facet);
+    dof_handler[DH_UNKM].getVariable(VAR_U).getFacetDofs(mapU_f.data(), &*facet);
     dof_handler[DH_MESH].getVariable(VAR_M).getFacetDofs(mapM_f.data(), &*facet);
 
     /*  Pega os valores das variáveis nos graus de liberdade */
@@ -2751,8 +2762,8 @@ double AppCtx::getMaxVelocity()
   {
     if (!mesh->isVertex(&*point))
         continue;
-    dof_handler[DH_UNKS].getVariable(VAR_U).getVertexDofs(vtx_dofs_fluid.data(), &*point);
-    VecGetValues(Vec_up_1, dim, vtx_dofs_fluid.data(), Uf.data());
+    dof_handler[DH_UNKM].getVariable(VAR_U).getVertexDofs(vtx_dofs_fluid.data(), &*point);
+    //VecGetValues(Vec_up_1, dim, vtx_dofs_fluid.data(), Uf.data());
     Umax = max(Umax,Uf.norm());
   }
   return Umax;
@@ -3243,8 +3254,8 @@ void AppCtx::freePetscObjs()
   //Destroy(ksp);
   //Destroy(snes);
   //SNESDestroy(&snes);
-  SNESDestroy(&snes_fs); SNESDestroy(&snes_m);
-
+  SNESDestroy(&snes_m);
+  SNESDestroy(&snes_fs);
   if (is_bdf3)
   {
     Destroy(Vec_x_aux);
@@ -3311,8 +3322,8 @@ double GetDataPressure::get_data_r(int nodeid) const
 double GetDataPressCellVersion::get_data_r(int cellid) const
 {
   // assume que só há 1 grau de liberdade na célula
-  int dof[user.dof_handler[DH_UNKS].getVariable(VAR_P).numDofsPerCell()];
-  user.dof_handler[DH_UNKS].getVariable(VAR_P).getCellDofs(dof, user.mesh->getCellPtr(cellid));
+  int dof[user.dof_handler[DH_UNKM].getVariable(VAR_Q).numDofsPerCell()];
+  user.dof_handler[DH_UNKM].getVariable(VAR_Q).getCellDofs(dof, user.mesh->getCellPtr(cellid));
   return q_array[dof[0]];
 }
 
@@ -3419,11 +3430,11 @@ int main(int argc, char **argv)
   user.mesh->timer.printTimes();
 
   cout << endl;
-  if (!user.feature_tags.empty()){
-    cout << "feature_tags =  ";
-    for (int i = 0; i < (int)user.feature_tags.size(); ++i)
+  if (!user.flusoli_tags.empty()){
+    cout << "flusoli_tags =  ";
+    for (int i = 0; i < (int)user.flusoli_tags.size(); ++i)
     {
-      cout << user.feature_tags[i] << " ";
+      cout << user.flusoli_tags[i] << " ";
     }
   cout << endl;
   }

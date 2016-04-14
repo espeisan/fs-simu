@@ -1742,7 +1742,7 @@ PetscErrorCode AppCtx::formFunction_mesh(SNES /*snes_m*/, Vec Vec_v, Vec Vec_fun
     VectorXd          Floc(n_dofs_v_per_cell);
     MatrixXd          Aloc(n_dofs_v_per_cell, n_dofs_v_per_cell);
 
-    VectorXi          mapV_c(n_dofs_v_per_cell), mapU_c(n_dofs_u_per_cell);  //TODO: i think is n_dofs_v_per_cell
+    VectorXi          mapV_c(n_dofs_v_per_cell); //mapU_c(n_dofs_u_per_cell);  //TODO: i think is n_dofs_v_per_cell
 
     MatrixXd          Prj(n_dofs_v_per_cell, n_dofs_v_per_cell);
     VectorXi          cell_nodes(nodes_per_cell);
@@ -1764,7 +1764,7 @@ PetscErrorCode AppCtx::formFunction_mesh(SNES /*snes_m*/, Vec Vec_v, Vec Vec_fun
       // mapeamento do local para o global: (ID local para ID global)
       // mapV_c saves global IDs for cell's nodes unknowns enumeration
       dof_handler[DH_MESH].getVariable(VAR_M).getCellDofs(mapV_c.data(), &*cell);  //cout << mapV_c.transpose() << endl;
-      dof_handler[DH_UNKM].getVariable(VAR_U).getCellDofs(mapU_c.data(), &*cell);  //cout << mapU_c.transpose() << endl;
+      //dof_handler[DH_UNKM].getVariable(VAR_U).getCellDofs(mapU_c.data(), &*cell);  //cout << mapU_c.transpose() << endl;
       /*  Pega os valores das variáveis nos graus de liberdade */
       VecGetValues(Vec_v ,  mapV_c.size(), mapV_c.data(), v_coefs_c.data());  //cout << v_coefs_c << endl;//VecView(Vec_v,PETSC_VIEWER_STDOUT_WORLD);
       VecGetValues(Vec_x_0, mapV_c.size(), mapV_c.data(), x_coefs_c.data());  //cout << x_coefs_c << endl;
@@ -1882,12 +1882,12 @@ PetscErrorCode AppCtx::formFunction_mesh(SNES /*snes_m*/, Vec Vec_v, Vec Vec_fun
       Floc = Prj*Floc;  //cout << Floc.transpose() << endl;
       Aloc = Prj*Aloc*Prj;  //zeros at dirichlet nodes (lines and columns)
 
-#ifdef FEP_HAS_OPENMP
-      FEP_PRAGMA_OMP(critical)
-#endif
+//#ifdef FEP_HAS_OPENMP
+//      FEP_PRAGMA_OMP(critical)
+//#endif
       {
         VecSetValues(Vec_fun, mapV_c.size(), mapV_c.data(), Floc.data(), ADD_VALUES);
-        MatSetValues(*JJ, mapV_c.size(), mapV_c.data(), mapV_c.size(), mapV_c.data(), Aloc.data(),  ADD_VALUES);
+        MatSetValues(*JJ, mapV_c.size(), mapV_c.data(), mapV_c.size(), mapV_c.data(), Aloc.data(), ADD_VALUES);
       }
     } // end cell loop
 
@@ -1951,7 +1951,6 @@ PetscErrorCode AppCtx::formJacobian_mesh(SNES /*snes*/,Vec /*Vec_up_k*/,Mat* /**
 // ******************************************************************************
 PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun_fs)
 {
-
   double utheta = AppCtx::utheta;
 
   if (is_bdf2)
@@ -1965,7 +1964,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     if (time_step <= 1)
       utheta = 0.5;
   }
-
+  VecSetOption(Vec_fun_fs, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
   VecSetOption(Vec_uzp_k, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
   std::vector<Vector2d> XG_mid = midGP(XG, XG_0, utheta, N_Solids);
   //std::vector<Vector2d> XG_mid = AppCtx::XG_mid;
@@ -1987,8 +1986,8 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     Vector X_new(dim);
     if (behaviors & BH_Press_grad_elim)  //TODO:actualizar Q
     {
-      cell_iterator cell = mesh->cellBegin();
-      dof_handler[DH_UNKS].getVariable(VAR_P).getCellDofs(&null_space_press_dof, &*cell);
+      //cell_iterator cell = mesh->cellBegin();
+      //dof_handler[DH_UNKS].getVariable(VAR_P).getCellDofs(&null_space_press_dof, &*cell);
       // fix the initial guess
       VecSetValue(Vec_uzp_k, null_space_press_dof, 0.0, INSERT_VALUES);
     }
@@ -2002,7 +2001,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       VecGetValues(Vec_x_1, dim, x_dofs, X_new.data());
       VecGetValues(Vec_x_0, dim, x_dofs, X.data());
       X = .5*(X+X_new);
-      dof_handler[DH_UNKS].getVariable(VAR_P).getVertexDofs(&null_space_press_dof, &*point);
+      //dof_handler[DH_UNKS].getVariable(VAR_P).getVertexDofs(&null_space_press_dof, &*point);
       // fix the initial guess
       VecSetValue(Vec_uzp_k, null_space_press_dof, p_exact(X,current_time+.5*dt,point->getTag()), INSERT_VALUES);
     }
@@ -2207,7 +2206,11 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     {
 
       tag = cell->getTag();
-      SFI = false;
+      SFI = false;  fill(SV_c.begin(), SV_c.end(), 0);
+      mapM_c = VectorXi::Zero(dim*nodes_per_cell);
+      mapU_c = VectorXi::Zero(n_dofs_u_per_cell);
+      mapP_c = VectorXi::Zero(n_dofs_p_per_cell);
+      mapZ_c = VectorXi::Zero(nodes_per_cell*3);
       // mapeamento do local para o global:
       dof_handler[DH_MESH].getVariable(VAR_M).getCellDofs(mapM_c.data(), &*cell);  //cout << mapM_c << endl;  //unk. global ID's
       dof_handler[DH_UNKM].getVariable(VAR_U).getCellDofs(mapU_c.data(), &*cell);  //cout << mapU_c << endl;
@@ -2237,6 +2240,9 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       z_coefs_c_aun = MatrixXd::Zero(dim,nodes_per_cell);
       uz_coefs_c    = MatrixXd::Zero(dim,n_dofs_u_per_cell/dim);
       uz_coefs_c_old= MatrixXd::Zero(dim,n_dofs_u_per_cell/dim);
+      v_coefs_c_mid = MatrixXd::Zero(nodes_per_cell,dim);
+      p_coefs_c_old = VectorXd::Zero(n_dofs_p_per_cell);
+      p_coefs_c_new = VectorXd::Zero(n_dofs_p_per_cell);
 
       if ((is_bdf2 && time_step > 0) || (is_bdf3 && time_step > 1))
         VecGetValues(Vec_v_1, mapM_c.size(), mapM_c.data(), v_coefs_c_mid.data());
@@ -3033,9 +3039,9 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
         }
       }
 
-#ifdef FEP_HAS_OPENMP
-      FEP_PRAGMA_OMP(critical)
-#endif
+//#ifdef FEP_HAS_OPENMP
+//      FEP_PRAGMA_OMP(critical)
+//#endif
       {
         VecSetValues(Vec_fun_fs, mapU_c.size(), mapU_c.data(), FUloc.data(), ADD_VALUES);
         VecSetValues(Vec_fun_fs, mapZ_c.size(), mapZ_c.data(), FZloc.data(), ADD_VALUES);
@@ -3052,10 +3058,9 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
         MatSetValues(*JJ, mapZ_c.size(), mapZ_c.data(), mapP_c.size(), mapP_c.data(), Z4loc.data(), ADD_VALUES);
         MatSetValues(*JJ, mapP_c.size(), mapP_c.data(), mapZ_c.size(), mapZ_c.data(), Z5loc.data(), ADD_VALUES);
       }
-      Assembly(Vec_fun_fs); Assembly(*JJ);
+      //Assembly(Vec_fun_fs); Assembly(*JJ);
       //View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
     }  //end for cell
-
 
   }  //end LOOP NAS CÉLULAS parallel
 
@@ -3091,7 +3096,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       VecSetValues(Vec_fun_fs, mapZ_s.size(), mapZ_s.data(), FZsloc.data(), ADD_VALUES);
       MatSetValues(*JJ, mapZ_s.size(), mapZ_s.data(), mapZ_s.size(), mapZ_s.data(), Z3sloc.data(), ADD_VALUES);
     }
-    Assembly(Vec_fun_fs); Assembly(*JJ);
+    //Assembly(Vec_fun_fs); Assembly(*JJ);
     //View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
   }
 
@@ -3665,7 +3670,6 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     MatSetValues(*JJ, 1, &null_space_press_dof, 1, &null_space_press_dof, &p, ADD_VALUES);
   }
 
-  Assembly(Vec_fun_fs); Assembly(*JJ);
   //View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
   if(print_to_matlab)
   {
@@ -3678,8 +3682,11 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     ja_foi = true;
 
   }
+  Assembly(Vec_fun_fs);
+  Assembly(*JJ);
   //MatZeroEntries(*JJ); SNESGetJacobian(snes_fs, JJ, NULL, NULL, NULL); Assembly(*JJ);
   //double val; VecNorm(Vec_fun_fs,NORM_2,&val); cout << "norma residuo " << val <<endl;
+
   PetscFunctionReturn(0);
 
 } // END formFunction

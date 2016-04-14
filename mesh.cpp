@@ -630,14 +630,14 @@ void AppCtx::smoothsMesh(Vec & Vec_normal_, Vec &Vec_x_)
         {
           Corner *edge = mesh->getCornerPtr(icell->getCornerId(m));
           dof_handler[DH_MESH].getVariable(VAR_M).getCornerDofs(edge_dofs_umesh.data(), &*edge);
-          dof_handler[DH_UNKS].getVariable(VAR_U).getCornerDofs(edge_dofs_fluid.data(), &*edge);
+          dof_handler[DH_UNKM].getVariable(VAR_U).getCornerDofs(edge_dofs_fluid.data(), &*edge);
           mesh->getCornerNodesId(&*edge, edge_nodes.data());
         }
         else // dim=2
         {
           Facet *edge = mesh->getFacetPtr(icell->getFacetId(m));
           dof_handler[DH_MESH].getVariable(VAR_M).getFacetDofs(edge_dofs_umesh.data(), &*edge);
-          dof_handler[DH_UNKS].getVariable(VAR_U).getFacetDofs(edge_dofs_fluid.data(), &*edge);
+          dof_handler[DH_UNKM].getVariable(VAR_U).getFacetDofs(edge_dofs_fluid.data(), &*edge);
           mesh->getFacetNodesId(&*edge, edge_nodes.data());
         }
 
@@ -781,7 +781,7 @@ PetscErrorCode AppCtx::meshAdapt()
   int tag_e;
 
   bool mesh_was_changed = false;
-
+  cout << "#z=" << n_unknowns_fs << " #u=" << n_unknowns_u << " #v=" << n_dofs_v_mesh  << endl;
   //printf("ENTRANDO NO LOOP is_splitting!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
   // first make collapses, then make splittings.
   // NOTE: mark added points
@@ -818,9 +818,8 @@ PetscErrorCode AppCtx::meshAdapt()
       //    is_in(tag_e, periodic_tags) ||
       //    is_in(tag_e, feature_tags)  )
       //  continue;
-        
-        
-
+      if (is_in(tag_e, flusoli_tags))
+        continue;
       if (!( tag_a==tag_b && tag_b==tag_e ) && (is_splitting==0))  //only edges inside the same type of domain
         continue;                                                  //(ex: inside fluid)
 
@@ -881,30 +880,44 @@ PetscErrorCode AppCtx::meshAdapt()
   //cout << "ANTES CHANGED" << endl;
   if (!mesh_was_changed)
     PetscFunctionReturn(0);
-  //cout << n_unknowns_fs << " " << n_unknowns_u << " " << n_dofs_v_mesh  << endl; //cout << "Y DESPUES CHANGED" << endl;
+  //cout << "Y DESPUES CHANGED" << endl;
   // atualiza tudo!
   meshAliasesUpdate();
-//  snes_fs = NULL;
-  SNESDestroy(&snes_fs); //SNESReset(snes_fs);
-  snes_m = NULL;
-  SNESDestroy(&snes_m);
+  //snes_fs = NULL;
+  //ierr = SNESDestroy(&snes_fs);    CHKERRQ(ierr);//SNESReset(snes_fs);
+  //snes_fs = NULL; snes_m = NULL;
+  //ierr = SNESDestroy(&snes_m);     CHKERRQ(ierr);
+  //snes_m = NULL;
   // free petsc matrices first and residues to save memory.
   // destroy only those who not depends on DofHandler
-  //Destroy(Mat_Jac_fs);  //Destroy(Mat_Jac);
   //Destroy(Mat_Jac_m);
-  //Destroy(Vec_res_fs);  //Destroy(Vec_res);
-  //Destroy(Vec_res_m);
-  Destroy(Vec_normal);
-  Destroy(Vec_v_mid);
+  //ierr = VecDestroy(&Vec_res_m);  CHKERRQ(ierr);
+  //ierr = VecDestroy(&Vec_normal);  CHKERRQ(ierr);
+  //ierr = VecDestroy(&Vec_v_mid);  CHKERRQ(ierr);
   //SNESReset(snes_m);
-  //SNESReset(snes_fs);  //SNESDestroy(&snes_fs); //SNESReset(snes);  //error con el SNESReset de snes_fs
-  //KSPReset(ksp_fs);  //KSPReset(ksp);
   //KSPReset(ksp_m);
-  //PCReset(pc_fs);  //PCReset(pc);
   //PCReset(pc_m);
   //SNESLineSearchReset(linesearch);
+  //Destroy(Mat_Jac_fs);  //Destroy(Mat_Jac);
+  //ierr = VecDestroy(&Vec_res_fs);  CHKERRQ(ierr);  //Destroy(Vec_res);
+  //SNESReset(snes_fs);  //SNESDestroy(&snes_fs); //SNESReset(snes);  //error con el SNESReset de snes_fs
+  //KSPReset(ksp_fs);  //KSPReset(ksp);
+  //PCReset(pc_fs);  //PCReset(pc);
+  Destroy(Mat_Jac_fs);
+  Destroy(Mat_Jac_m);
+  Destroy(Vec_res_fs);
+  Destroy(Vec_res_m);
+  Destroy(Vec_normal);
+  Destroy(Vec_v_mid);
+  SNESReset(snes_fs);
+  SNESReset(snes_m);
+  KSPReset(ksp_fs);
+  KSPReset(ksp_m);
+  PCReset(pc_fs);
+  PCReset(pc_m);
+  SNESLineSearchReset(linesearch);
 
-  DofHandler  dof_handler_tmp[3];
+  DofHandler  dof_handler_tmp[2];
   
   // tranfers variables values from old to new mesh
   {
@@ -913,6 +926,7 @@ PetscErrorCode AppCtx::meshAdapt()
     dof_handler_tmp[DH_UNKM].copy(dof_handler[DH_UNKM]);  //dof_handler_tmp[DH_UNKS].copy(dof_handler[DH_UNKS]);
 
     dofsUpdate();  //updates DH_ information: # variables u, z, p, mesh can change
+    cout << "#z=" << n_unknowns_fs << " #u=" << n_unknowns_u << " #v=" << n_dofs_v_mesh  << endl;
 
     int n_solid_nodes_0 = dof_handler_tmp[DH_UNKM].getVariable(VAR_Z).numPositiveDofs()/3;
     int n_solid_nodes_1 = dof_handler    [DH_UNKM].getVariable(VAR_Z).numPositiveDofs()/3;
@@ -942,13 +956,15 @@ PetscErrorCode AppCtx::meshAdapt()
       for (int i = 0; i < vsize; ++i)
         temp[i] = array[i];
       VecRestoreArray(*petsc_vecs[v], &array);
-      *petsc_vecs[v] = NULL;
-      Destroy(*petsc_vecs[v]);
-
+      //*petsc_vecs[v] = NULL;
+      Destroy(*petsc_vecs[v]);  //ierr = VecDestroy(&*petsc_vecs[v]);  CHKERRQ(ierr);
+      //*petsc_vecs[v] = NULL;
       ierr = VecCreate(PETSC_COMM_WORLD, petsc_vecs[v]);                              CHKERRQ(ierr);
       ierr = VecSetSizes(*petsc_vecs[v], PETSC_DECIDE, n_unks_t[v]);                  CHKERRQ(ierr);  //dof_handler[DH_t[v]].numDofs()
       ierr = VecSetFromOptions(*petsc_vecs[v]);                                       CHKERRQ(ierr);
-      ierr = VecSetOption(*petsc_vecs[v], VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);    CHKERRQ(ierr);
+      if (v == 0 || v == 1){//DH_UNKM
+        ierr = VecSetOption(*petsc_vecs[v], VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);  CHKERRQ(ierr);
+      }
 
       int tagP, nod_id;
 
@@ -1038,24 +1054,69 @@ PetscErrorCode AppCtx::meshAdapt()
         int const Nlinks = sizeof(link)/sizeof(Point*);
         double const weight = 1./Nlinks;
         //printf("a_id = b_id %d %d!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n", a_id, b_id);
+        tagP = point->getTag();
+        nod_id = is_in_id(tagP,flusoli_tags);
         for (int k = 0; k < dof_handler_tmp[DH_t[v]].numVars(); ++k)
         {
-          dof_handler[DH_t[v]].getVariable(k).getVertexAssociatedDofs(dofs_1, &*point);
-
-          for (int j = 0; j < Nlinks; ++j)
-          {
-            dof_handler_tmp[DH_t[v]].getVariable(k).getVertexAssociatedDofs(dofs_0, link[j]);
-            //printf("v = %d  x = %lf  y = %lf !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n", v, temp[dofs_0[0]], temp[dofs_0[1]]);
-            for (int c = 0; c < dof_handler_tmp[DH_t[v]].getVariable(k).numDofsPerVertex(); ++c)
-              array[dofs_1[c]] += weight*temp[dofs_0[c]];
+          if (v == 0 || v == 1){//DH_UNKM
+            if(nod_id){
+              if (k == VAR_Z){
+                cout << "FALTA!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!mesh 1063" << endl; //TODO: actualizar
+              }
+              else if (k == VAR_Q){
+                dof_handler[DH_t[v]].getVariable(k).getVertexAssociatedDofs(dofs_1, &*point);
+                for (int j = 0; j < Nlinks; ++j)
+                {
+                  dof_handler_tmp[DH_t[v]].getVariable(k).getVertexAssociatedDofs(dofs_0, link[j]);
+                  dofs_0[0] = dofs_0[0] - p_id_cor_0;
+                  dofs_1[0] = dofs_1[0] - p_id_cor_1;
+                  //printf("v = %d  x = %lf  y = %lf !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n", v, temp[dofs_0[0]], temp[dofs_0[1]]);
+                  for (int c = 0; c < dof_handler_tmp[DH_t[v]].getVariable(k).numDofsPerVertex(); ++c)
+                    array[dofs_1[c]] += weight*temp[dofs_0[c]];
+                }
+              }
+            }
+            else{
+              if (k == VAR_U){
+                dof_handler[DH_t[v]].getVariable(k).getVertexAssociatedDofs(dofs_1, &*point);
+                for (int j = 0; j < Nlinks; ++j)
+                {
+                  dof_handler_tmp[DH_t[v]].getVariable(k).getVertexAssociatedDofs(dofs_0, link[j]);
+                  //printf("v = %d  x = %lf  y = %lf !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n", v, temp[dofs_0[0]], temp[dofs_0[1]]);
+                  for (int c = 0; c < dof_handler_tmp[DH_t[v]].getVariable(k).numDofsPerVertex(); ++c)
+                    array[dofs_1[c]] += weight*temp[dofs_0[c]];
+                }
+              }
+              else if(k == VAR_Q){
+                dof_handler[DH_t[v]].getVariable(k).getVertexAssociatedDofs(dofs_1, &*point);
+                for (int j = 0; j < Nlinks; ++j)
+                {
+                  dof_handler_tmp[DH_t[v]].getVariable(k).getVertexAssociatedDofs(dofs_0, link[j]);
+                  dofs_0[0] = dofs_0[0] - p_id_cor_0;
+                  dofs_1[0] = dofs_1[0] - p_id_cor_1;
+                  //printf("v = %d  x = %lf  y = %lf !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n", v, temp[dofs_0[0]], temp[dofs_0[1]]);
+                  for (int c = 0; c < dof_handler_tmp[DH_t[v]].getVariable(k).numDofsPerVertex(); ++c)
+                    array[dofs_1[c]] += weight*temp[dofs_0[c]];
+                }
+              }
+            }
+          }//end DH_UNKM
+          else if (v == 2 || v == 3){//DH_MESH
+            dof_handler[DH_t[v]].getVariable(k).getVertexAssociatedDofs(dofs_1, &*point);
+            for (int j = 0; j < Nlinks; ++j)
+            {
+              dof_handler_tmp[DH_t[v]].getVariable(k).getVertexAssociatedDofs(dofs_0, link[j]);
+              //printf("v = %d  x = %lf  y = %lf !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n", v, temp[dofs_0[0]], temp[dofs_0[1]]);
+              for (int c = 0; c < dof_handler_tmp[DH_t[v]].getVariable(k).numDofsPerVertex(); ++c)
+                array[dofs_1[c]] += weight*temp[dofs_0[c]];
+            }
           }
-        }
-        
-      }
+        } //end DH_MESH
+      } //end for k variables
       VecRestoreArray(*petsc_vecs[v], &array);
       Assembly(*petsc_vecs[v]);
     } // end loop in vectors
-
+    //Destroy(Vec_uzp_1);
     std::list<EdgeVtcs>::iterator it     = adde_vtcs.begin();
     std::list<EdgeVtcs>::iterator it_end = adde_vtcs.end();
     for (; it != it_end; ++it)
@@ -1381,7 +1442,7 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
                 VecGetValues(Vec_up_1,  3, node_dofs_solid_fs.data(), U1_fs.data());
                 tmp_fs = vtheta*U1_fs + (1.-vtheta)*U0_fs;
                 point->getCoord(Xp.data(),dim);  //coords node1 of current edge
-                tmp_n = SolidVel(Xp,Xg,tmp_fs);
+                tmp_n = SolidVel(Xp,Xg,tmp_fs);  //cout << tmp_n.transpose() << "  ";
                 VecSetValues(Vec_v_mid, dim, node_dofs_mesh.data(), tmp_n.data(), INSERT_VALUES);
 //              }
             }
@@ -1400,12 +1461,12 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
     } // end for point
     //VecView(Vec_v_mid,PETSC_VIEWER_STDOUT_WORLD); VecView(Vec_up_0,PETSC_VIEWER_STDOUT_WORLD); VecView(Vec_up_1,PETSC_VIEWER_STDOUT_WORLD);
   } // b.c.
-
+  //Assembly(Vec_v_mid); View(Vec_v_mid,"matrizes/vmid1.m","vmidm1");
   if (!force_mesh_velocity)
   {
     ierr = SNESSolve(snes_m, PETSC_NULL, Vec_v_mid);  CHKERRQ(ierr);
   }
-
+  //View(Vec_v_mid,"matrizes/vmid2.m","vmidm2");
   // don't let edges to be curved
   if (mesh->numNodesPerCell() > mesh->numVerticesPerCell())
   {
@@ -1488,8 +1549,8 @@ PetscErrorCode AppCtx::moveMesh(Vec const& Vec_x_0, Vec const& Vec_up_0, Vec con
     tag = point->getTag();
 
     getNodeDofs(&*point, DH_MESH, VAR_M, node_dofs_mesh.data());
-    getNodeDofs(&*point, DH_UNKS, VAR_U, node_dofs_fluid.data());
-
+    //getNodeDofs(&*point, DH_UNKS, VAR_U, node_dofs_fluid.data());
+    getNodeDofs(&*point, DH_UNKM, VAR_U, node_dofs_fluid.data());
     VecGetValues(Vec_x_0,   dim, node_dofs_mesh.data(), X0.data());
 
     if (force_mesh_velocity)
