@@ -1334,6 +1334,7 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
     Vector      Xp(dim), Xg(dim);
 
     int tag, nod_id;
+    double Ar;
 
     Vector      U0(dim), U0_fs(3);
     Vector      X0(dim), Y0(dim);
@@ -1435,8 +1436,9 @@ PetscErrorCode AppCtx::calcMeshVelocity(Vec const& Vec_x_0, Vec const& Vec_up_0,
 //          if (!fluidonly_tags.empty() && (dim == 2)){
             if (nod_id){
               if(!SV[nod_id-1]){
-                Xg = getAreaMassCenterSolid(nod_id);
+                Xg = getAreaMassCenterSolid(nod_id, Ar);
                 XG[nod_id-1] = Xg;  SV[nod_id-1] = true;
+                if (time_step == 0) {AV[nod_id-1] = Ar;}
               }
                 Xg = XG[nod_id-1];
                 VecGetValues(Vec_up_0,  3, node_dofs_solid_fs.data(), U0_fs.data());

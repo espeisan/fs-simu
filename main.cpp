@@ -467,10 +467,10 @@ bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
     if (!is.good()) {cout << "mass file not found" << endl;}
     for (; N > 0; N--){
       is >> mass; is >> rad; //cout << mass << "   " << rad << endl;
-      MV.push_back(mass); RV.push_back(rad);
+      MV.push_back(mass); RV.push_back(rad); AV.push_back(0.0);
     }
     is.close();
-    MV.resize(N_Solids), RV.resize(N_Solids);
+    MV.resize(N_Solids); RV.resize(N_Solids); AV.resize(N_Solids);
   }
 
   //if (neumann_tags.size() + interface_tags.size() == 0 || force_pressure)
@@ -1007,7 +1007,7 @@ PetscErrorCode AppCtx::allocPetscObjs()
   {
     ierr = SNESSetType(snes_m, SNESKSPONLY); CHKERRQ(ierr);
   }
-//  ierr = SNESSetFromOptions(snes_m); CHKERRQ(ierr);  //prints newton iterations information SNES Function norm
+  ierr = SNESSetFromOptions(snes_m); CHKERRQ(ierr);  //prints newton iterations information SNES Function norm
 
 //~ #ifdef PETSC_HAVE_MUMPS
   //~ PCFactorSetMatSolverPackage(pc_m,MATSOLVERMUMPS);
@@ -1990,12 +1990,12 @@ int TT = 0;
       for (int G = 0; G < N_Solids; G++){
         Xgg = XG[G];
         filg << Xgg(0) << " " << Xgg(1) << endl;
-      } filg.close();
-      char buf1[18], buf2[10];
-      sprintf(buf1,"matrizes/sol%d.m",TT); sprintf(buf2,"solm%d",TT);
-      View(Vec_uzp_0, buf1, buf2);
-      sprintf(buf1,"matrizes/mal%d.m",TT); sprintf(buf2,"malm%d",TT);
-      View(Vec_x_0, buf1, buf2);  TT++;
+      } filg.close();  TT++;
+      //char buf1[18], buf2[10];
+      //sprintf(buf1,"matrizes/sol%d.m",TT); sprintf(buf2,"solm%d",TT);
+      //View(Vec_uzp_0, buf1, buf2);
+      //sprintf(buf1,"matrizes/mal%d.m",TT); sprintf(buf2,"malm%d",TT);
+      //View(Vec_x_0, buf1, buf2);  TT++;
       for (int kk = 0 ; kk < 1+3*full_implicit; kk++)
       {
         printf("\tFixed Point Iteration %d\n", kk);
@@ -2801,7 +2801,7 @@ double AppCtx::getMeshVolume()
   return volume;
 }
 
-Vector AppCtx::getAreaMassCenterSolid(int sol_id){
+Vector AppCtx::getAreaMassCenterSolid(int sol_id, double &A){
   std::vector<Vector2d> XP;
   Vector Xp(dim);
   int tag, nod_id;
@@ -2827,7 +2827,7 @@ Vector AppCtx::getAreaMassCenterSolid(int sol_id){
 //  cout << endl;
 
   //area
-  double A = 0;
+  A = 0;//double A = 0;
   for (int i = 0; i < NS; i++){
     A = A + XPO[i](0)*XPO[i+1](1) - XPO[i+1](0)*XPO[i](1);
   }

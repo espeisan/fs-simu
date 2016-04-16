@@ -434,7 +434,7 @@ public:
   void pressureTimeCorrection(Vec &Vec_up_0, Vec &Vec_up_1, double a, double b);
 
   std::vector<Vector2d> ConvexHull2d(std::vector<Vector2d> & LI);  //counterclockwise
-  Vector getAreaMassCenterSolid(int solid);
+  Vector getAreaMassCenterSolid(int solid, double &A);
   double getMeshVolume();
   double getMaxVelocity();
   //void printContactAngle(bool _print);
@@ -623,7 +623,7 @@ public:
   
   int                    N_Solids;
   std::vector<int>       NN_Solids;
-  std::vector<double>    MV, RV;  //mass vector, radius vector
+  std::vector<double>    MV, RV, AV;  //mass vector, radius vector, area vector
   std::vector<Vector2d>  XG, XG_0;//, XG_mid;
   //bool                   casevar = true, casevarc = true; //case variable or const to H solid vel functional
 
