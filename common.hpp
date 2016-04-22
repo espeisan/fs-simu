@@ -119,6 +119,11 @@ Vector v_exact(Vector const& X, double t, int tag);
 Vector solid_veloc(Vector const& X, double t, int tag);
 Tensor feature_proj(Vector const& X, double t, int tag);
 Vector gravity(Vector const& X);
+Vector force_pp(Vector const& Xi, Vector const& Xj, double Ri, double Rj,
+                 double ep1, double ep2, double zeta);
+Vector force_pw(Vector const& Xi, Vector const& Xj, double Ri,
+                 double ew1, double ew2, double zeta);
+Vector force_ppl(Vector const& Xi, Vector const& Xj, double ep, double zeta);
 
 
 //inline double sum_vec(std::vector<int> V){
@@ -435,8 +440,11 @@ public:
 
   std::vector<Vector2d> ConvexHull2d(std::vector<Vector2d> & LI);  //counterclockwise
   Vector getAreaMassCenterSolid(int solid, double &A);
+  void calcHmean(double &hmean, double &hmin, double &hmax);
   double getMeshVolume();
   double getMaxVelocity();
+  bool proxTest(MatrixXd &Contact, MatrixXd &ContW, double const INF);
+  void forceDirichlet();
   //void printContactAngle(bool _print);
 
 
@@ -479,7 +487,7 @@ public:
   PetscBool   ale;
   PetscBool   plot_exact_sol;
   PetscBool   family_files;
-  PetscBool   fprint_ca; // print contact angle
+  PetscBool   fprint_ca, fprint_hgv; // print contact angle, gravity velocity solid
   PetscBool   nonlinear_elasticity;
   PetscBool   mesh_adapt;
   PetscBool   is_bdf3;
@@ -496,7 +504,7 @@ public:
   double      utheta;
   double      vtheta;
   int         maxts;
-  double     finaltime;
+  double      finaltime;
   PetscBool   force_pressure;
   bool        solve_the_sys;
   int         quadr_degree_cell;
@@ -506,7 +514,7 @@ public:
   bool        pres_pres_block;
   float       grow_factor;
   string      filename, filemass;
-  string      filename_out;
+  string      filename_out, filehist_out;
 
   std::vector<int> dirichlet_tags;   // vetor com os tags que indicam contorno dirichlet
   std::vector<int> neumann_tags;     // vetor com os tags que indicam contorno neumann
@@ -625,6 +633,7 @@ public:
   std::vector<int>       NN_Solids;
   std::vector<double>    MV, RV, AV;  //mass vector, radius vector, area vector
   std::vector<Vector2d>  XG, XG_0;//, XG_mid;
+  double                 hme, hmn, hmx;
   //bool                   casevar = true, casevarc = true; //case variable or const to H solid vel functional
 
   // mesh alias

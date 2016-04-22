@@ -26,6 +26,11 @@ Vector z_initial(Vector const& X, int tag);
 Vector solid_normal(Vector const& X, double t, int tag);
 Tensor feature_proj(Vector const& X, double t, int tag);
 Vector gravity(Vector const& X);
+Vector force_pp(Vector const& Xi, Vector const& Xj, double Ri, double Rj,
+                 double ep1, double ep2, double zeta);
+Vector force_pw(Vector const& Xi, Vector const& Xj, double Ri,
+                 double ew1, double ew2, double zeta);
+Vector force_ppl(Vector const& Xi, Vector const& Xj, double ep, double zeta);
 
 
 // gota estática 2d/////////////////////////////////////////////////////////////
@@ -194,7 +199,7 @@ double pho(Vector const& X, int tag)
 {
 //  if (tag == 15)
 //  {
-    return 2.0;///1e4;
+    return 1.0;///1e4;
 //  }
 //  else
 //  {
@@ -226,7 +231,7 @@ double muu(int tag)
 {
 //  if (tag == 15)
 //  {
-    return 0.1;
+    return 0.1;//1.0*0.1;
 //  }
 //  else
 //  {
@@ -242,7 +247,7 @@ Vector force(Vector const& X, double t, int tag)
   Vector f(Vector::Zero(X.size()));
 //  if (tag == 15)
 //  {
-    f(1) = -10.0*2.0;//*1e4;//*1e3;
+    f(1) = -980.0*1.0;//pho(X,tag);//*1e4;//*1e3;
 //
 //  else
 //  {
@@ -258,7 +263,7 @@ Vector gravity(Vector const& X){
   Vector f(Vector::Zero(X.size()));
   //if (tag == 15)
   //{
-    f(1) = -10.0;//-8e-4;  //*1e3;
+    f(1) = -980.0;//-8e-4;  //*1e3;
   //}
   //else
   //{
@@ -373,8 +378,48 @@ Tensor feature_proj(Vector const& X, double t, int tag)
   return f;
 }
 
+Vector force_pp(Vector const& Xi, Vector const& Xj, double Ri, double Rj,
+                 double ep1, double ep2, double zeta)
+{
+  Vector f(Vector::Zero(Xi.size()));
+  double dij = (Xi - Xj).norm();
+//  if (dij > Ri+Rj+zeta){
+//    return f;
+//  }
+  if (dij <= Ri+Rj){
+    f = (1/ep1)*(Ri+Rj-dij)*(Xi - Xj);
+  }
+  else if((Ri+Rj <= dij) && (dij <= Ri+Rj+zeta)){
+    f = (1/ep2)*(Ri+Rj+zeta-dij)*(Ri+Rj+zeta-dij)*(Xi - Xj);
+  }
+  return f;
+}
+
+Vector force_pw(Vector const& Xi, Vector const& Xj, double Ri,
+                 double ew1, double ew2, double zeta)
+{
+  Vector f(Vector::Zero(Xi.size()));
+  double di = (Xi - Xj).norm();
+//  if (dij > Ri+Rj+zeta){
+//    return f;
+//  }
+  if (di <= 2*Ri){
+    f = (1/ew1)*(2*Ri-di)*(Xi - Xj);
+  }
+  else if((2*Ri <= di) && (di <= 2*Ri+zeta)){
+    f = (1/ew2)*(2*Ri+zeta-di)*(2*Ri+zeta-di)*(Xi - Xj);
+  }
+  return f;
+}
+
 #endif
 
+Vector force_ppl(Vector const& Xi, Vector const& Xj, double ep, double zeta)
+{
+  Vector f(Vector::Zero(Xi.size()));
+  f = (zeta/ep)*(Xi - Xj)/(Xi - Xj).norm();
+  return f;
+}
 
 // canal /////////////////////////////////////////////////////////////
 #if (false)

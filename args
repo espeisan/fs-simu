@@ -3,7 +3,7 @@
 -finaltime 3
 -maxts -40
 -renumber_dofs 0
--print_step 10
+-print_step 1
 -has_convec 1
 -unsteady   1
 -boundary_smoothing 0
@@ -82,7 +82,7 @@ solid 2d    dir_tags 13  fsi_tags 14  fonly_tags 15,13
 solid 2d 2b dir_tags 1-5,33  fsi_tags 5  fonly_tags 1-5,100,33
 solid 2d Nb dir_tags 1-6  fsi_tags 101-107  fonly_tags 1-7
 solid 2d 3b dir_tags 1-6  fsi_tags 101-104  fonly_tags 1-7
-solid 2d 3b   -dir_tags 1  -fsi_tags 101,102  -fonly_tags  1,2
+solid 2d 3b   -dir_tags 1-6  -fsi_tags 101,102  -fonly_tags 1-6,10
 
 function_space 1
 function_space 2
@@ -108,14 +108,12 @@ mesh_type 4096
 fin results/canal/canal_ord1.msh
 fout results/canal/canal.vtk
 
-fin results/sol_asc/2d/solid_micro_3.msh
-fout results/sol_asc/2d/out_MAd/solid_micro_.vtk
-min results/sol_asc/2d/solid_micro_34.txt
+fin results/sol_asc/2d/2sol1.msh
+fout results/sol_asc/2d/2sol1/2sol1_.vtk
+min results/sol_asc/2d/2sol.txt
+hout results/sol_asc/2d/2sol1
 
-fin results/sol_asc/2d/tube_Nb_solid.msh
-fout results/sol_asc/2d/out_Nb/solid_Nb_solid_.vtk
-min results/sol_asc/2d/tube_Nb_solid.txt
-
--fin results/sol_asc/2d/tube_2d_solid_O1.msh
--fout results/sol_asc/2d/out_O1/solid_2d_solid_.vtk
--min results/sol_asc/2d/tube_2d_solid.txt
+-fin results/sol_asc/2d/1sol1.msh
+-fout results/sol_asc/2d/1sol1/1sol1_.vtk
+-min results/sol_asc/2d/1sol.txt
+-hout results/sol_asc/2d/1sol1

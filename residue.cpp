@@ -1815,7 +1815,7 @@ PetscErrorCode AppCtx::formFunction_mesh(SNES /*snes_m*/, Vec Vec_v, Vec Vec_fun
               {
                 for (int l = 0; l < dim; ++l)
                 {
-                  sigma_ck += dxV(c,l)*dxV(k,l);//dxV(l,c)*dxV(l,k);  // i think is dxV(c,l)*dxV(k,l);
+                  sigma_ck += dxV(l,c)*dxV(l,k);  // i think is dxV(c,l)*dxV(k,l);
 
                   if (c==k)
                   {
@@ -2216,8 +2216,8 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       dof_handler[DH_UNKM].getVariable(VAR_U).getCellDofs(mapU_c.data(), &*cell);  //cout << mapU_c << endl;
       dof_handler[DH_UNKM].getVariable(VAR_Q).getCellDofs(mapP_c.data(), &*cell);  //cout << mapP_c << endl;
       mapP_c = mapP_c - p_id_cor;
-      dof_handler[DH_UNKM].getVariable(VAR_Z).getCellDofs(mapZ_c.data(), &*cell);  //cout << mapZ_c << endl; // Z global ids for the current cell
 
+      dof_handler[DH_UNKM].getVariable(VAR_Z).getCellDofs(mapZ_c.data(), &*cell);  //cout << mapZ_c << endl; // Z global ids for the current cell
       for (int j = 0; j < nodes_per_cell; ++j){
         tag_c = mesh->getNodePtr(cell->getNodeId(j))->getTag();
         nod_id = is_in_id(tag_c,flusoli_tags);
@@ -2656,17 +2656,16 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
           for (int I = 0; I < nodes_per_cell; I++){
             int K = SV_c[I];
             if (K != 0){
+              XIp   = x_coefs_c_mid_trans.col(I); //ref point Xp, old, mid, or new
+              XIg   = XG_mid[K-1];                //mass center, mid, _0, "new"
+              RotfI = SolidVel(XIp,XIg,Zw);       //fixed evaluation point Xp, old, mid or new
+              TenfI = RotfI * dxphi_c.row(I);     //Grad(Ni*RotfI)
               for (int C = 0; C < 3; C++){
                 for (int j = 0; j < n_dofs_p_per_cell; j++){
                   if (C < 2){
                     Z4loc(I*3+C,j) -= JxW_mid*psi_c[qp][j]*dxphi_c(I,C);
                   }
                   else{
-                    XIp   = x_coefs_c_mid_trans.col(I); //ref point Xp, old, mid, or new
-                    XIg   = XG_mid[K-1];                //mass center, mid, _0, "new"
-                    RotfI = SolidVel(XIp,XIg,Zw);       //fixed evaluation point Xp, old, mid or new
-                    TenfI = RotfI * dxphi_c.row(I);     //Grad(Ni*RotfI)
-
                     Z4loc(I*3+C,j) -= JxW_mid*TenfI.trace();
                   }
                 }
@@ -2678,17 +2677,16 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
           for (int J = 0; J < nodes_per_cell; J++){
             int L = SV_c[J];
             if (L != 0){
+              XJp   = x_coefs_c_mid_trans.col(J); //ref point Xp, old, mid, or new
+              XJg   = XG_mid[L-1];                //mass center, mid, _0, "new"
+              RotfJ = SolidVel(XJp,XJg,Zw);       //fixed evaluation point Xp, old, mid or new
+              TenfJ = RotfJ * dxphi_c.row(J);     //Grad(Nj*RotfJ)
               for (int D = 0; D < 3; D++){
                 for (int i = 0; i < n_dofs_p_per_cell; i++){
                   if (D < 2){
                     Z5loc(i,J*3+D) -= utheta*JxW_mid*psi_c[qp][i]*dxphi_c(J,D);
                   }
                   else{
-                    XJp   = x_coefs_c_mid_trans.col(J); //ref point Xp, old, mid, or new
-                    XJg   = XG_mid[L-1];                //mass center, mid, _0, "new"
-                    RotfJ = SolidVel(XJp,XJg,Zw);       //fixed evaluation point Xp, old, mid or new
-                    TenfJ = RotfJ * dxphi_c.row(J);     //Grad(Nj*RotfJ)
-
                     Z5loc(i,J*3+D) -= utheta*JxW_mid*TenfJ.trace();
                   }
                 }
@@ -2833,7 +2831,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
           for (int i = 0; i < n_dofs_p_per_cell; ++i)
             FPloc(i) -= JxW_mid *tauk* dxpsi_c.row(i).dot(Res);  //minus?
             //FPloc(i) -= JxW_mid *tauk* dxpsi_c.row(i).dot(dxP_new - force_at_mid); // somente laplaciano da pressao
-//#if (false)
+#if (false)
           if (SFI){
             // residue
             for (int I = 0; I < nodes_per_cell; I++){
@@ -2912,9 +2910,103 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
               }
             }//end for I Z2
 
+            //jacobian Z3
+            for (int I = 0; I < nodes_per_cell; I++){
+              int K = SV_c[I];
+              if (K != 0){
+                XIp   = x_coefs_c_mid_trans.col(I); //ref point Xp, old, mid, or new
+                XIg   = XG_mid[K-1];                //mass center, mid, _0, "new"
+                RotfI = SolidVel(XIp,XIg,Zw);       //fixed evaluation point Xp, old, mid or new
+                TenfI = RotfI * dxphi_c.row(I);     //Grad(Ni*RotfI)
+                for (int J = 0; J < nodes_per_cell; J++){
+                  int L = SV_c[J];
+                  if (L != 0){
+                    XJp   = x_coefs_c_mid_trans.col(J); //ref point Xp, old, mid, or new
+                    XJg   = XG_mid[L-1];                //mass center, mid, _0, "new"
+                    RotfJ = SolidVel(XJp,XJg,Zw);       //fixed evaluation point Xp, old, mid or new
+                    TenfJ = RotfJ * dxphi_c.row(J);     //Grad(Nj*RotfJ)
+                    ConfJ = TenfJ * Uconv_qp + phi_c[qp][J] * dxU * RotfJ;
+                    Ten = JxW_mid*tauk* has_convec*( utheta*rho*phi_c[qp][J]*Res*dxphi_c.row(I) + rho*Uconv_qp.dot(dxphi_c.row(I))*dResdu );
+                    for (int C = 0; C < 3; C++){
+                      for (int D = 0; D < 3; D++){
+                        if (C < 2){
+                          if (D < 2){
+                            Z3loc(I*3+C,J*3+D) += Ten(C,D);
+                          }
+                          else{
+                            Z3loc(I*3+C,J*3+D) += JxW_mid*tauk*rho*
+                                ( Uconv_qp.dot(dxphi_c.row(I))*( ddt_factor*unsteady*rho*RotfJ(C)*phi_c[qp][J]/dt +
+                                                                 has_convec*utheta*rho*ConfJ(C) ) +
+                                  utheta*RotfJ.dot(dxphi_c.row(I))*Res(C) );
+                          }
+                        }
+                        else{
+                          if (D < 2){
+                            Z3loc(I*3+C,J*3+D) += JxW_mid*tauk*rho*
+                                 ( dResdu.col(D).dot(TenfI*Uconv_qp) + utheta*phi_c[qp][J]*Res.dot(TenfI.col(D)));
+                          }
+                          else{
+                            Z3loc(I*3+C,J*3+D) += JxW_mid*tauk*rho*
+                                 ( (TenfI*Uconv_qp).dot( ddt_factor*unsteady*rho*(phi_c[qp][J]/dt)*RotfJ +
+                                                         has_convec*utheta*rho*ConfJ) +
+                                   utheta*phi_c[qp][J]*(TenfI*RotfI).dot(Res) );
+                          }
+                        }
+                      }
+                    }
+                  }
+                }//end for J Z3
+              }
+            }//end for I Z3
 
+            //jacobian Z4
+            for (int I = 0; I < nodes_per_cell; I++){
+              int K = SV_c[I];
+              if (K != 0){
+                XIp   = x_coefs_c_mid_trans.col(I); //ref point Xp, old, mid, or new
+                XIg   = XG_mid[K-1];                //mass center, mid, _0, "new"
+                RotfI = SolidVel(XIp,XIg,Zw);       //fixed evaluation point Xp, old, mid or new
+                TenfI = RotfI * dxphi_c.row(I);     //Grad(Ni*RotfI)
+                for (int C = 0; C < 3; C++){
+                  for (int j = 0; j < n_dofs_p_per_cell; j++){
+                    vec = JxW_mid*tauk* has_convec*rho*Uconv_qp.dot(dxphi_c.row(I))* dxpsi_c.row(j).transpose();
+                    if (C < 2){
+                      Z4loc(I*3+C,j) += vec(C);
+                    }
+                    else{
+                      Z4loc(I*3+C,j) += dxpsi_c.row(j).dot(TenfI*Uconv_qp);
+                    }
+                  }
+                }
+              }
+            }//end for I Z4
+
+            //jacobian Z5
+            for (int J = 0; J < nodes_per_cell; J++){
+              int L = SV_c[J];
+              if (L != 0){
+                XJp   = x_coefs_c_mid_trans.col(J); //ref point Xp, old, mid, or new
+                XJg   = XG_mid[L-1];                //mass center, mid, _0, "new"
+                RotfJ = SolidVel(XJp,XJg,Zw);       //fixed evaluation point Xp, old, mid or new
+                TenfJ = RotfJ * dxphi_c.row(J);     //Grad(Nj*RotfJ)
+                ConfJ = TenfJ * Uconv_qp + phi_c[qp][J] * dxU * RotfJ;
+                for (int D = 0; D < 3; D++){
+                  for (int i = 0; i < n_dofs_p_per_cell; i++){
+                    vec = -JxW_mid*tauk* dResdu.transpose()*dxpsi_c.row(i).transpose();
+                    if (D < 2){
+                      Z5loc(i,J*3+D) += vec(D);
+                    }
+                    else{
+                      Z5loc(i,J*3+D) -= JxW_mid*tauk*rho*
+                           ( dxpsi_c.row(i).dot(ddt_factor*unsteady*rho*(phi_c[qp][J]/dt)*RotfJ +
+                             has_convec*utheta*rho*ConfJ) );
+                    }
+                  }
+                }
+              }
+            }//end for I Z5
           } //end SFI
-//#endif
+#endif
         } //end if(behaviors & BH_GLS)
 #if (false)
         if (behaviors & BH_bble_condens_CR)
@@ -3108,10 +3200,91 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
     VectorXd   z_coefs_old(3);
     VectorXd   z_coefs_new(3);
     Vector     dZdt(3);
-    Vector     Grav;
+    Vector     Grav, Fpp, Fpw;
     MatrixXd   Z3sloc = MatrixXd::Zero(3,3);
+    double     zet = 1.0e2;
+    double     ep = 1.0e-2, INF = 1.0e5;
+    //calcHmean(hme, hmn, hmx);  //cout << hme << " " << hmn << "" << hmx << endl;
 
+    MatrixXd ContP(MatrixXd::Zero(N_Solids,N_Solids)), ContW(MatrixXd::Zero(N_Solids,5));
+    bool RepF = proxTest(ContP, ContW, INF);
+    //cout << ContP << endl << ContW << endl;
+    Vector coor(dim);
+    Vector2d   Xj;
+
+    //cout << hme << endl;
     for (int K = 0; K < N_Solids; K++){
+
+      Fpp = Vector::Zero(dim); Fpw = Vector::Zero(dim);
+
+#if (false)
+      for (int L = 0; L < N_Solids; L++){
+        if (L != K){
+          Fpp += force_pp(XG_mid[K], XG_mid[L], RV[K], RV[L],
+                          ep, ep, hme);
+        }
+      }
+      {
+        Vector coor(dim);
+        Vector2d   Xj;
+        mesh->getNodePtr(0)->getCoord(coor.data(),dim);  //cout << coor.transpose() << "   ";
+        Xj << 2*coor[0]-XG_mid[K](0), XG_mid[K](1);   //cout << Xj.transpose() << endl;
+        Fpw += force_pw(XG_mid[K], Xj, RV[K], ep, ep*ep, hme);  //cout << Fpw.transpose() << endl;
+
+        Xj << XG_mid[K](0), 2*coor[1]-XG_mid[K](1);   //cout << Xj.transpose() << endl;
+        Fpw += force_pw(XG_mid[K], Xj, RV[K], ep, ep*ep, hme);  //cout << Fpw.transpose() << endl;
+
+        mesh->getNodePtr(2)->getCoord(coor.data(),dim);  //cout << coor.transpose() << endl;
+        Xj << 2*coor[0]-XG_mid[K](0), XG_mid[K](1);   //cout << Xj.transpose() << endl;
+        Fpw += force_pw(XG_mid[K], Xj, RV[K], ep, ep*ep, hme);  //cout << Fpw.transpose() << endl;
+
+        Xj << XG_mid[K](0), 2*coor[1]-XG_mid[K](1);   //cout << Xj.transpose() << endl;
+        Fpw += force_pw(XG_mid[K], Xj, RV[K], ep, ep*ep, hme);  //cout << Fpw.transpose() << endl;
+
+        if ((Fpp.norm() != 0) || (Fpw.norm() != 0)){
+          cout << K << "   " << Fpp.transpose() << "   " << Fpw.transpose() << endl;
+        }
+      }
+#endif
+
+      if (RepF){
+        //Point to Point
+        for (int L = 0; L < N_Solids; L++){
+          ep = ContP(K,L);
+          if ((L != K) && (ep < INF)){
+            Fpp += force_ppl(XG_mid[K], XG_mid[L], ep, zet);
+          }
+        }
+        //Point to wall
+        mesh->getNodePtr(0)->getCoord(coor.data(),dim);  //left-inf corner
+        ep = ContW(K,0);
+        if (ep < INF){
+          Xj << 2*coor[0]-XG_mid[K](0), XG_mid[K](1);   //cout << Xj.transpose() << endl;
+          Fpw += force_ppl(XG_mid[K], Xj, ep, zet);  //cout << Fpw.transpose() << endl;
+        }
+        ep = ContW(K,1);
+        if (ep < INF){
+          Xj << XG_mid[K](0), 2*coor[1]-XG_mid[K](1);   //cout << Xj.transpose() << endl;
+          Fpw += force_ppl(XG_mid[K], Xj, ep, zet);  //cout << Fpw.transpose() << endl;
+        }
+        mesh->getNodePtr(2)->getCoord(coor.data(),dim);  //rigth-sup corner
+        ep = ContW(K,2);
+        if (ep < INF){
+          Xj << 2*coor[0]-XG_mid[K](0), XG_mid[K](1);   //cout << Xj.transpose() << endl;
+          Fpw += force_ppl(XG_mid[K], Xj, ep, zet);  //cout << Fpw.transpose() << endl;
+        }
+        ep = ContW(K,3);
+        if (ep < INF){
+          Xj << XG_mid[K](0), 2*coor[1]-XG_mid[K](1);   //cout << Xj.transpose() << endl;
+          Fpw += force_ppl(XG_mid[K], Xj, ep, zet);  //cout << Fpw.transpose() << endl;
+        }
+
+        //if ((Fpp.norm() != 0) || (Fpw.norm() != 0)){
+        //  cout << K << "   " << Fpp.transpose() << "   " << Fpw.transpose() << endl;
+        //}
+
+      }// end repulsion force
+
       Grav = gravity(XG_mid[K]);
       for (int C = 0; C < 3; C++){
         mapZ_s(C) = n_unknowns_u - 1
@@ -3122,7 +3295,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       dZdt = (z_coefs_new - z_coefs_old)/dt;
       for (int C = 0; C < 3; C++){
         if (C < 2){
-          FZsloc(C) = MV[K]*dZdt(C) - MV[K]*Grav(C);
+          FZsloc(C) = MV[K]*dZdt(C) - MV[K]*Grav(C) - Fpp(C) - Fpw(C);
           Z3sloc(C,C) = MV[K]/dt;
         }
         else{
@@ -3132,7 +3305,7 @@ PetscErrorCode AppCtx::formFunction_fs(SNES /*snes*/, Vec Vec_uzp_k, Vec Vec_fun
       }
       VecSetValues(Vec_fun_fs, mapZ_s.size(), mapZ_s.data(), FZsloc.data(), ADD_VALUES);
       MatSetValues(*JJ, mapZ_s.size(), mapZ_s.data(), mapZ_s.size(), mapZ_s.data(), Z3sloc.data(), ADD_VALUES);
-    }
+    }//end K
     //Assembly(Vec_fun_fs); Assembly(*JJ);
     //View(Vec_fun_fs, "matrizes/rhs.m","res"); View(*JJ,"matrizes/jacob.m","Jac");
   }

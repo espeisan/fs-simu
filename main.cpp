@@ -203,7 +203,7 @@ void AppCtx::setUpDefaultOptions()
   family_files           = PETSC_TRUE;
   has_convec             = PETSC_TRUE;
   renumber_dofs          = PETSC_FALSE;
-  fprint_ca              = PETSC_FALSE;
+  fprint_ca              = PETSC_FALSE; fprint_hgv = PETSC_FALSE;
   nonlinear_elasticity   = PETSC_FALSE;
   mesh_adapt             = PETSC_TRUE;
 
@@ -212,9 +212,9 @@ void AppCtx::setUpDefaultOptions()
 
 bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
 {
-  PetscBool          flg_fin, flg_fout, flg_min;
+  PetscBool          flg_fin, flg_fout, flg_min, flg_hout;
   char               finaux[PETSC_MAX_PATH_LEN], minaux[PETSC_MAX_PATH_LEN];
-  char               foutaux[PETSC_MAX_PATH_LEN];
+  char               foutaux[PETSC_MAX_PATH_LEN], houtaux[PETSC_MAX_PATH_LEN];
   PetscBool          ask_help;
 
   if (argc == 1)
@@ -263,6 +263,7 @@ bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
   PetscOptionsGetString(PETSC_NULL,"-fin",finaux,PETSC_MAX_PATH_LEN-1,&flg_fin);
   PetscOptionsGetString(PETSC_NULL,"-fout",foutaux,PETSC_MAX_PATH_LEN-1,&flg_fout);
   PetscOptionsGetString(PETSC_NULL,"-min",minaux,PETSC_MAX_PATH_LEN-1,&flg_min);
+  PetscOptionsGetString(PETSC_NULL,"-hout",houtaux,PETSC_MAX_PATH_LEN-1,&flg_hout);
   PetscOptionsHasName(PETSC_NULL,"-help",&ask_help);
 
   is_bdf3            = PETSC_FALSE;
@@ -464,13 +465,18 @@ bool AppCtx::getCommandLineOptions(int argc, char **/*argv*/)
     int N = N_Solids; double mass, rad;
     ifstream is;
     is.open(filemass.c_str(),ifstream::in);
-    if (!is.good()) {cout << "mass file not found" << endl;}
+    if (!is.good()) {cout << "mass file not found" << endl; throw;}
     for (; N > 0; N--){
       is >> mass; is >> rad; //cout << mass << "   " << rad << endl;
       MV.push_back(mass); RV.push_back(rad); AV.push_back(0.0);
     }
     is.close();
     MV.resize(N_Solids); RV.resize(N_Solids); AV.resize(N_Solids);
+  }
+
+  if (flg_hout){
+    filehist_out.assign(houtaux);
+    fprint_hgv = PETSC_TRUE;
   }
 
   //if (neumann_tags.size() + interface_tags.size() == 0 || force_pressure)
@@ -1869,6 +1875,7 @@ PetscErrorCode AppCtx::solveTimeProblem()
   printf("initial volume: %.15lf \n", initial_volume);
   current_time = 0;
   time_step = 0;
+  //calcHmean(hme, hmn, hmx);
   double Qmax=0;
   double steady_error=1;
   setInitialConditions();  //called only here
@@ -1951,10 +1958,27 @@ PetscErrorCode AppCtx::solveTimeProblem()
 //    VecCopy(Vec_up_1, Vec_up_0);
     cout << "inside BDF2 main 1953" << endl;
   }//end if BDF2
-int TT = 0;
+
+  //print solid's center information
+//  if (fprint_hgv){
+    ofstream filg, filv;
+    Vector Xgg(dim);
+    VectorXd v_coeffs_s(3*N_Solids);
+    VectorXi mapvs(3*N_Solids);
+    //int TT = 0;
+    char gravc[PETSC_MAX_PATH_LEN], velc[PETSC_MAX_PATH_LEN];
+    sprintf(gravc,"%s/HistGrav.txt",filehist_out.c_str());
+    sprintf(velc,"%s/HistVel.txt",filehist_out.c_str());
+    if (fprint_hgv){
+      filg.open(gravc);
+      filv.open(velc);
+      filg.close();
+      filv.close();
+    }
+  //  }
+
   for(;;)  // equivalent to forever or while(true), must be a break inside
   {
-
 
     cout << endl;
     cout << "current time: " << current_time << endl;
@@ -1966,10 +1990,9 @@ int TT = 0;
     //Xe(1) = 0;
     //x_error += (X-Xe).norm()/maxts;
 
-
     if (maxts == 0)
     {
-//      computeError(Vec_x_0, Vec_up_0,current_time);
+      computeError(Vec_x_0, Vec_uzp_0,current_time);
       break;
     }
 
@@ -1982,15 +2005,30 @@ int TT = 0;
     // * SOLVE THE SYSTEM *
     if (solve_the_sys)
     {
+
       setUPInitialGuess();  //setup Vec_up_1 for SNESSolve
-      char gravc[23];
-      sprintf(gravc,"matrizes/gravc%d.txt",TT);
-      ofstream filg; filg.open(gravc);
-      Vector Xgg(dim);
-      for (int G = 0; G < N_Solids; G++){
-        Xgg = XG[G];
-        filg << Xgg(0) << " " << Xgg(1) << endl;
-      } filg.close();  TT++;
+
+      if (fprint_hgv){
+        if ((time_step%print_step)==0 || time_step == (maxts-1)){
+          for (int S = 0; S < 3*N_Solids; S++){
+            mapvs[S] = n_unknowns_u + S;
+          }
+          VecGetValues(Vec_uzp_0,mapvs.size(),mapvs.data(),v_coeffs_s.data());
+          filg.open(gravc,iostream::app);
+          filv.open(velc,iostream::app);
+          for (int S = 0; S < (N_Solids-1); S++){
+            Xgg = XG[S];
+            filg << Xgg(0) << " " << Xgg(1) << " ";
+            filv << v_coeffs_s(3*S) << " " << v_coeffs_s(3*S+1) << " " << v_coeffs_s(3*S+2) << " ";
+          }
+          Xgg = XG[N_Solids-1];
+          filg << Xgg(0) << " " << Xgg(1) << endl;
+          filv << v_coeffs_s(3*(N_Solids-1)) << " " << v_coeffs_s(3*(N_Solids-1)+1) << " "
+               << v_coeffs_s(3*(N_Solids-1)+2) << endl;
+          filg.close();  //TT++;
+          filv.close();
+        }
+      }
       //char buf1[18], buf2[10];
       //sprintf(buf1,"matrizes/sol%d.m",TT); sprintf(buf2,"solm%d",TT);
       //View(Vec_uzp_0, buf1, buf2);
@@ -2039,7 +2077,7 @@ int TT = 0;
 
         }//end if full_implicit
 
-
+        forceDirichlet();
 
       }
     } // end if (solve_the_system)
@@ -2080,7 +2118,7 @@ int TT = 0;
     }
 //    else
     {
-      if (false && time_step == 0) //TODO: actualizar el false
+      if (time_step == 0) //TODO: actualizar el false
       {
 //        pressureTimeCorrection(Vec_up_0, Vec_up_1, 0., 1); // press(n) = press(n+1/2) - press(n-1/2)
         if (plot_exact_sol && maxts <= 1)
@@ -2089,7 +2127,7 @@ int TT = 0;
       else
       {
 //        pressureTimeCorrection(Vec_up_0, Vec_up_1, .5, .5); // press(n) = press(n+1/2) - press(n-1/2)
-        if (false && plot_exact_sol)  //TODO: actualizar el false
+        if (plot_exact_sol)  //TODO: actualizar el false
           computeError(Vec_x_0, Vec_uzp_0,current_time);//computeError(Vec_x_0, Vec_up_0,current_time);
       }
     }
@@ -2486,18 +2524,22 @@ void AppCtx::computeError(Vec const& Vec_x, Vec &Vec_up, double tt)
   MatrixXd            dxphi_err(n_dofs_u_per_cell/dim, dim);
   MatrixXd            dxpsi_err(n_dofs_p_per_cell, dim);
   MatrixXd            dxqsi_err(nodes_per_cell, dim);
-  Tensor              dxU(dim,dim); // grad u
+  Tensor              dxU(dim,dim), dxZ(dim,dim); // grad u
   Vector              dxP(dim);     // grad p
   Vector              Xqp(dim);
-  Vector              Uqp(dim);
+  Vector              Uqp(dim), Zqp(dim);
+  MatrixXd            z_coefs_c(n_dofs_z_per_cell/3, 3);        // n
+  MatrixXd            z_coefs_c_trans(3,n_dofs_z_per_cell/3);   // n
+  MatrixXd            z_coefs_f(n_dofs_z_per_facet/3,3);   // n+1
+  MatrixXd            z_coefs_f_trans(3,n_dofs_z_per_facet/3);   // n+1
+  MatrixXd            uz_coefs_c(dim, n_dofs_u_per_cell/dim);
 
   double              Pqp;
   VectorXi            cell_nodes(nodes_per_cell);
   double              J, JxW;
   double              weight;
-  int                 tag;
+  int                 tag, tag_c, nod_id;;
   double              volume=0;
-
 
   double              p_L2_norm = 0.;
   double              u_L2_norm = 0.;
@@ -2509,7 +2551,6 @@ void AppCtx::computeError(Vec const& Vec_x, Vec &Vec_up, double tt)
   double              u_L2_facet_norm = 0.;
   double              u_inf_facet_norm = 0.;
 
-
   VectorXi            mapU_c(n_dofs_u_per_cell);
   VectorXi            mapU_f(n_dofs_u_per_facet);
   VectorXi            mapU_r(n_dofs_u_per_corner);
@@ -2518,7 +2559,22 @@ void AppCtx::computeError(Vec const& Vec_x, Vec &Vec_up, double tt)
   VectorXi            mapM_c(dim*nodes_per_cell);
   VectorXi            mapM_f(dim*nodes_per_facet);
   VectorXi            mapM_r(dim*nodes_per_corner);
+  VectorXi            mapZ_c(nodes_per_cell*3);
+  VectorXi            mapZ_f(nodes_per_facet*3);
 
+  //Q Dofs re-organization
+  VectorXi p_id_cor = VectorXi::Ones(n_dofs_p_per_cell);  //cout << p_id_cor;
+  int n_solid_nodes = dof_handler[DH_UNKM].getVariable(VAR_Z).numPositiveDofs()/3;
+  p_id_cor = 3*(n_solid_nodes-N_Solids)*p_id_cor;
+
+  std::vector<bool>   SV(N_Solids,false);     //solid visited history
+  std::vector<int>    SV_c(nodes_per_cell,0); //maximum nodes in solid visited saving the solid tag
+  bool                SFI;                    //solid-fluid interception
+
+  Vector2d XIp, XIp_new, XIp_old, XJp, XJp_new, XJp_old;
+  std::vector<Vector2d> XG_mid = midGP(XG, XG_0, utheta, N_Solids);
+
+  VecSetOption(Vec_up, VEC_IGNORE_NEGATIVE_INDICES,PETSC_TRUE);
 
   cell_iterator cell = mesh->cellBegin();
   cell_iterator cell_end = mesh->cellEnd();
@@ -2527,10 +2583,28 @@ void AppCtx::computeError(Vec const& Vec_x, Vec &Vec_up, double tt)
     tag = cell->getTag();
 
     // mapeamento do local para o global:
-    //
+    dof_handler[DH_MESH].getVariable(VAR_M).getCellDofs(mapM_c.data(), &*cell);
     dof_handler[DH_UNKM].getVariable(VAR_U).getCellDofs(mapU_c.data(), &*cell);
     dof_handler[DH_UNKM].getVariable(VAR_Q).getCellDofs(mapP_c.data(), &*cell);
-    dof_handler[DH_MESH].getVariable(VAR_M).getCellDofs(mapM_c.data(), &*cell);
+    mapP_c = mapP_c - p_id_cor;
+
+    dof_handler[DH_UNKM].getVariable(VAR_Z).getCellDofs(mapZ_c.data(), &*cell);  //cout << mapZ_c << endl; // Z global ids for the current cell
+    for (int j = 0; j < nodes_per_cell; ++j){
+      tag_c = mesh->getNodePtr(cell->getNodeId(j))->getTag();
+      nod_id = is_in_id(tag_c,flusoli_tags);
+      if (nod_id){
+        for (int l = 0; l < 3; l++){  // the 3 here is for Z quantity of Dofs for 2D case
+          mapZ_c(j*3 + l) = n_unknowns_u - 1
+                          + 3*nod_id - 2 + l;
+        }
+        SFI = true;  //cout << "Solid " << nod_id << " visited." << endl;
+      }
+      SV_c[j]=nod_id;
+    }
+
+    u_coefs_c = MatrixXd::Zero(n_dofs_u_per_cell/dim,dim);
+    z_coefs_c = MatrixXd::Zero(n_dofs_z_per_cell/3,3);
+    uz_coefs_c    = MatrixXd::Zero(dim,n_dofs_u_per_cell/dim);
 
     /*  Pega os valores das variáveis nos graus de liberdade */
     VecGetValues(Vec_up, mapU_c.size(), mapU_c.data(), u_coefs_c.data());
@@ -2538,9 +2612,7 @@ void AppCtx::computeError(Vec const& Vec_x, Vec &Vec_up, double tt)
     VecGetValues(Vec_x,  mapM_c.size(), mapM_c.data(), x_coefs_c.data());
 
     u_coefs_c_trans = u_coefs_c.transpose();
-
-    //mesh->getCellNodesId(&*cell, cell_nodes.data());
-    //mesh->getNodesCoords(cell_nodes.begin(), cell_nodes.end(), x_coefs_c.data());
+    z_coefs_c_trans = z_coefs_c.transpose();
     x_coefs_c_trans = x_coefs_c.transpose();
 
     for (int qp = 0; qp < n_qpts_err; ++qp)
@@ -2561,6 +2633,23 @@ void AppCtx::computeError(Vec const& Vec_x, Vec &Vec_up, double tt)
       Uqp  = u_coefs_c_trans * phi_err[qp];
       Pqp  = p_coefs_c.dot(psi_err[qp]);
 
+      Zqp = Vector::Zero(2);
+
+      if (SFI){
+        for (int J = 0; J < nodes_per_cell; J++){
+          if (SV_c[J]){
+            XJp = x_coefs_c_trans.col(J);
+            //for dxU
+            uz_coefs_c.col(J)    = SolidVel(XJp,XG_mid[SV_c[J]-1],z_coefs_c_trans.col(J));
+          }
+        }
+
+        dxZ      = uz_coefs_c * dLphi_err[qp] * invF_c;  //cout << dxZ << endl;
+        Zqp      = uz_coefs_c * phi_err[qp];                 //cout << Zqp << endl;
+        Uqp      += Zqp;
+        dxU      += dxZ;                    //cout << dxU << endl;
+      }
+
       weight = quadr_err->weight(qp);
 
       JxW = J*weight;
@@ -2577,7 +2666,7 @@ void AppCtx::computeError(Vec const& Vec_x, Vec &Vec_up, double tt)
     } // fim quadratura
 
   } // end elementos
-
+#if (false)
   facet_iterator facet = mesh->facetBegin();
   facet_iterator facet_end = mesh->facetEnd();
   for (; facet != facet_end; ++facet)
@@ -2628,7 +2717,7 @@ void AppCtx::computeError(Vec const& Vec_x, Vec &Vec_up, double tt)
     } // fim quadratura
 
   }
-
+#endif
 
   u_L2_norm      = sqrt(u_L2_norm     );
   p_L2_norm      = sqrt(p_L2_norm     );
@@ -2687,14 +2776,14 @@ void AppCtx::computeError(Vec const& Vec_x, Vec &Vec_up, double tt)
     }
   }
   hmean /= n_edges;
-
+  //hme = hmean;
   //if (time_step==maxts)
   {
     cout << endl;
     //cout << "errors computed at last time step: "<< endl;
     //cout << "# hmean               u_L2_norm         p_L2_norm         grad_u_L2_norm    grad_p_L2_norm   u_L2_facet_norm    u_inf_facet_norm" << endl;
     printf("%-21s %-21s %-21s %-21s %-21s %-21s %s\n", "# hmean", "u_L2_norm", "p_L2_norm", "grad_u_L2_norm", "grad_p_L2_norm", "u_L2_facet_norm", "u_inf_facet_norm" );
-    printf("%.15e %.15e %.15e %.15e %.15e %.15e %.15e\n\n",hmean, u_L2_norm, p_L2_norm, grad_u_L2_norm, grad_p_L2_norm, u_L2_facet_norm,  u_inf_facet_norm);
+    printf("%.15e %.15e %.15e %.15e %.15e %.15e %.15e\n\n", hmean, u_L2_norm, p_L2_norm, grad_u_L2_norm, grad_p_L2_norm, u_L2_facet_norm, u_inf_facet_norm);
   }
 
   Stats.add_p_L2_norm        (p_L2_norm       );
@@ -2866,6 +2955,156 @@ std::vector<Vector2d> AppCtx::ConvexHull2d(std::vector<Vector2d> & LI){
 
   H.resize(k);
   return H;
+}
+
+void AppCtx::calcHmean(double &hmean, double &hmin, double &hmax){
+  VectorXi edge_nodes(3);
+  Vector Xa(dim), Xb(dim);
+  int n_edges=0;
+  double hmn = 0, hmx = 0;
+  hmean = 0;
+
+  if (dim==2)
+  //FEP_PRAGMA_OMP(parallel default(none) shared(hmean))
+  {
+    const int n_edges_total = mesh->numFacetsTotal();
+    Facet const* edge(NULL);
+    //double hlist[n_edges_total];
+
+    //FEP_PRAGMA_OMP(for nowait)
+    for (int a = 0; a < n_edges_total; ++a)
+    {
+      edge = mesh->getFacetPtr(a);
+      if (edge->isDisabled())
+        continue;
+
+      mesh->getFacetNodesId(&*edge, edge_nodes.data());
+
+      mesh->getNodePtr(edge_nodes[0])->getCoord(Xa.data(),dim);
+      mesh->getNodePtr(edge_nodes[1])->getCoord(Xb.data(),dim);
+      hmean += (Xa-Xb).norm(); //hlist[a] = (Xa-Xb).norm();
+      ++n_edges;
+    }
+    //cout << "Here" << endl;
+    //hmn = *min_element(hlist,hlist+n_edges_total);
+    //hmx = *max_element(hlist,hlist+n_edges_total);
+  }
+  else
+  if (dim==3)
+  //FEP_PRAGMA_OMP(parallel default(none) shared(cout,hmean))
+  {
+    const int n_edges_total = mesh->numCornersTotal();
+    Corner const* edge(NULL);
+    //double hlist[n_edges_total];
+    //FEP_PRAGMA_OMP(for nowait)
+    for (int a = 0; a < n_edges_total; ++a)
+    {
+      edge = mesh->getCornerPtr(a);
+      if (edge->isDisabled())
+        continue;
+
+      mesh->getCornerNodesId(&*edge, edge_nodes.data());
+
+      mesh->getNodePtr(edge_nodes[0])->getCoord(Xa.data(),dim);
+      mesh->getNodePtr(edge_nodes[1])->getCoord(Xb.data(),dim);
+      hmean += (Xa-Xb).norm(); //hlist[a] = (Xa-Xb).norm();
+      ++n_edges;
+    }
+    //hmn = *min_element(hlist,hlist+n_edges_total);
+    //hmx = *max_element(hlist,hlist+n_edges_total);
+  }
+  hmean /= n_edges;
+  hmin = hmn; hmax = hmx;
+}
+
+bool AppCtx::proxTest(MatrixXd &ContP, MatrixXd &ContW, double const INF){
+  ContP = MatrixXd::Constant(N_Solids,N_Solids,INF);
+  ContW = MatrixXd::Constant(N_Solids,5,INF);  //5 tags for dirichlet
+
+//  std::vector<bool> Contact(N_Solids+1,false);
+//  std::vector<double> Hmin(N_Solids+1,0.0);
+  VectorXi edge_nodes(3); // 3 nodes at most
+  Vector Xa(dim), Xb(dim);
+  const int n_edges_total = mesh->numFacetsTotal();
+  Facet const* edge(NULL);
+  int tag_a, tag_b, tag_e;
+  int K, L;
+  bool RepF = false;
+  double hv = 0;
+
+  //FEP_PRAGMA_OMP(for nowait)
+  for (int a = 0; a < n_edges_total; ++a)
+  {
+    edge = mesh->getFacetPtr(a);
+    if (edge->isDisabled())
+      continue;
+
+    mesh->getFacetNodesId(&*edge, edge_nodes.data());
+
+    tag_a = mesh->getNodePtr(edge_nodes[0])->getTag();
+    if (mesh->isVertex(mesh->getNodePtr(edge_nodes[1])))
+      tag_b = mesh->getNodePtr(edge_nodes[1])->getTag();
+    else
+      tag_b = mesh->getNodePtr(edge_nodes[2])->getTag();
+    tag_e = edge->getTag();
+    //cout << tag_a << "  " << tag_b << "  " << tag_e << endl;
+
+    if ((tag_a==tag_b) && (tag_b==tag_e))  //only edges outside the same type of domain
+      continue;
+    if ( (is_in(tag_a, fluidonly_tags) && !is_in(tag_a, dirichlet_tags)) ||
+         (is_in(tag_b, fluidonly_tags) && !is_in(tag_b, dirichlet_tags)) )
+      continue;
+    if (is_in(tag_e, dirichlet_tags))
+      continue;
+
+    RepF = true;
+
+    mesh->getNodePtr(edge_nodes[0])->getCoord(Xa.data(),dim);
+    mesh->getNodePtr(edge_nodes[1])->getCoord(Xb.data(),dim);
+    hv = (Xa-Xb).norm();  //cout << Xa.transpose() << "   " << Xb.transpose() << endl;
+
+    K = is_in_id(tag_a,flusoli_tags);  //K or L = 0, means the point is wall
+    L = is_in_id(tag_b,flusoli_tags);
+    if ((K != 0) && (L != 0)){
+      if (hv < ContP(K-1,L-1)){
+        ContP(K-1,L-1) = hv;
+        ContP(L-1,K-1) = hv;
+      }  //saves the smallest distance
+    }
+    else if (K == 0){
+      K = is_in_id(tag_a,dirichlet_tags);
+      if (hv < ContW(L-1,K-1)){
+        ContW(L-1,K-1) = hv;
+      }
+    }
+    else if (L == 0){
+      L = is_in_id(tag_b,dirichlet_tags);
+      if (hv < ContW(K-1,L-1)){
+        ContW(K-1,L-1) = hv;
+      }
+    }
+  }//end for edges
+  return RepF;
+}
+
+void AppCtx::forceDirichlet(){
+  Vector    U1(dim);
+  Vector    X1(dim);
+  VectorXi  u_dofs(dim);
+  int tag;
+  point_iterator point = mesh->pointBegin();
+  point_iterator point_end = mesh->pointEnd();
+  for ( ; point != point_end; ++point)
+  {
+    tag = point->getTag();
+    if (is_in(tag,dirichlet_tags)){
+      point->getCoord(X1.data(),dim);
+      getNodeDofs(&*point, DH_UNKM, VAR_U, u_dofs.data());
+      U1 = u_exact(X1, current_time+dt, tag);
+      VecSetValues(Vec_uzp_1, dim, u_dofs.data(), U1.data(), INSERT_VALUES);
+    }
+  }
+  Assembly(Vec_uzp_1);
 }
 
 #if (false)
@@ -3237,6 +3476,7 @@ void AppCtx::printContactAngle(bool _print)
   File.close();
 }
 #endif
+
 void AppCtx::freePetscObjs()
 {
   Destroy(Mat_Jac_fs); //Destroy(Mat_Jac);

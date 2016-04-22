@@ -764,7 +764,7 @@ PetscErrorCode AppCtx::meshAdapt()
   if (mesh->numNodesPerCell() > mesh->numVerticesPerCell())
     PetscFunctionReturn(0);
 
-  const Real TOL = 0.6;
+  const Real TOL = 0.9; //0.6
 
   typedef tuple<int, int, int> EdgeVtcs; // get<0> = mid node, get<1> = top node, get<2> = bot node
 
